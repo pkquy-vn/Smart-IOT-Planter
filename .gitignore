@@ -1,0 +1,15 @@
+# PlatformIO specific
+.pio/
+.vscode/
+
+# Build results and temp files
+.build/
+*.bin
+*.elf
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Ignore local config overrides (e.g. WiFi credentials if we extract them to a secrets header later)
+# include/secrets.h
