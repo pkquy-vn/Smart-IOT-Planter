@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlantBall } from '@/components/plant-ball';
@@ -19,27 +19,61 @@ function moistureState(m: number) {
 
 function CameraView() {
   const [tick, setTick] = useState(0);
+  const [ok, setOk] = useState(true);
+  const [lastFrame, setLastFrame] = useState<Date | null>(null);
+  const pulse = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     if (CONFIG.USE_MOCK) return;
     const id = setInterval(() => setTick((t) => t + 1), CONFIG.CAMERA_REFRESH_MS);
     return () => clearInterval(id);
   }, []);
 
+  // Soft blink on the LIVE dot
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const caption = CONFIG.USE_MOCK
+    ? 'Connect the planter to see your plant'
+    : lastFrame
+      ? `Updated ${lastFrame.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
+      : 'Connecting…';
+
   return (
-    <View style={styles.camera}>
-      {CONFIG.USE_MOCK ? (
-        <Text style={styles.cameraText}>Camera preview{'\n'}(demo mode)</Text>
-      ) : (
-        <Image
-          source={{ uri: `${CONFIG.CAMERA_SNAPSHOT_URL}?t=${tick}` }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="none"
-        />
-      )}
-      <View style={styles.liveBadge}>
-        <Text style={styles.liveText}>● LIVE</Text>
+    <View style={styles.cameraCard}>
+      <View style={styles.cameraHeader}>
+        <Text style={styles.cameraTitle}>Live view</Text>
+        <View style={[styles.liveBadge, !ok && { backgroundColor: P.muteLight }]}>
+          <Animated.View style={[styles.liveDot, { opacity: ok ? pulse : 1 }]} />
+          <Text style={styles.liveText}>{ok ? 'LIVE' : 'NO SIGNAL'}</Text>
+        </View>
       </View>
+
+      <View style={styles.cameraFrame}>
+        {CONFIG.USE_MOCK ? (
+          <Text style={styles.cameraText}>Camera preview{'\n'}(demo mode)</Text>
+        ) : (
+          <Image
+            source={{ uri: `${CONFIG.CAMERA_SNAPSHOT_URL}?t=${tick}` }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="none"
+            transition={0}
+            onLoad={() => { setOk(true); setLastFrame(new Date()); }}
+            onError={() => setOk(false)}
+          />
+        )}
+      </View>
+
+      <Text style={styles.cameraCaption}>{caption}</Text>
     </View>
   );
 }
@@ -77,13 +111,21 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [watering, setWatering] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const failRef = useRef(0);
+  const busyRef = useRef(false);
 
   const refresh = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setStatus(await getStatus());
+      failRef.current = 0;
       setError(null);
     } catch {
-      setError("Can't reach the planter. Same Wi-Fi? Check the IP in Edit plant.");
+      failRef.current += 1;
+      if (failRef.current >= 3) setError("Can't reach the planter. Same Wi-Fi? Check the IP in Edit plant.");
+    } finally {
+      busyRef.current = false;
     }
   }, []);
 
@@ -200,7 +242,7 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: P.paper },
-  content: { padding: 18, gap: 14, paddingBottom: 40 },
+  content: { padding: 18, gap: 14, paddingBottom: 40, width: '100%', maxWidth: 720, alignSelf: 'center' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   hello: { fontSize: 24, fontWeight: '900', color: P.ink },
   sub: { color: P.mute, fontSize: 13 },
@@ -225,14 +267,22 @@ const styles = StyleSheet.create({
   barTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4, backgroundColor: P.white },
 
-  camera: { height: 220, borderRadius: 26, backgroundColor: P.mist, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  cameraCard: { backgroundColor: P.white, borderRadius: 26, padding: 14, gap: 10 },
+  cameraHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cameraTitle: { color: P.ink, fontSize: 16, fontWeight: '800' },
+  cameraFrame: {
+    width: '100%', aspectRatio: 4 / 3, borderRadius: 20, backgroundColor: P.mist,
+    borderWidth: 1, borderColor: P.mist, overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+  },
   cameraText: { color: P.mute, textAlign: 'center', fontSize: 16 },
-  liveBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: P.moss, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: P.moss, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: P.white },
   liveText: { color: P.white, fontSize: 12, fontWeight: '800' },
+  cameraCaption: { color: P.mute, fontSize: 12, textAlign: 'center' },
 
   button: { backgroundColor: P.moss, borderRadius: 40, paddingVertical: 20, alignItems: 'center' },
   buttonText: { color: P.white, fontSize: 18, fontWeight: '800' },
   message: { textAlign: 'center', color: P.ink, fontWeight: '700' },
-  error: { color: '#B3261E', textAlign: 'center' },
+  error: { color: P.alert, backgroundColor: P.white, textAlign: 'center', fontWeight: '600', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16 },
   footer: { textAlign: 'center', color: P.mute, fontSize: 13 },
 });

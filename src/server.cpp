@@ -52,7 +52,7 @@ void initServer() {
         html += "<div id='msg'></div>";
         html += "</div>";
         html += "<script>";
-        html += "setInterval(()=>{ document.getElementById('cam').src = '/capture?t=' + Date.now(); }, 300);";
+        html += "setInterval(()=>{ document.getElementById('cam').src = '/capture?t=' + Date.now(); }, 500);";
         html += "async function updateStats(){ try{ const r=await fetch('/status'); const d=await r.json(); document.getElementById('moist').innerText=d.moisture+'%'; }catch(e){} }";
         html += "setInterval(updateStats, 2000); updateStats();";
         html += "async function water(){";

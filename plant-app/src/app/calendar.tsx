@@ -141,7 +141,7 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: P.paper },
-  content: { padding: 16, gap: 16, paddingBottom: 120 },
+  content: { padding: 16, gap: 16, paddingBottom: 120, width: '100%', maxWidth: 720, alignSelf: 'center' },
   title: { alignSelf: 'center', color: P.mute, fontWeight: '700', fontSize: 14, marginTop: 4 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
   month: { fontSize: 26, fontWeight: '800', color: P.forest, minWidth: 140, textAlign: 'center' },
