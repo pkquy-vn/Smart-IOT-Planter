@@ -60,7 +60,7 @@ All responses carry permissive CORS headers so the app can call the board direct
 
 - The pump runs for `PUMP_ON_DURATION_MS` and is switched off from `loop()`. An `esp_timer`
   failsafe forces the relay off shortly after that even if `loop()` is stuck.
-- Waterings are limited by `PUMP_COOLDOWN_MS` and `PUMP_MAX_RUNS_PER_DAY`.
+- Waterings are limited by `PUMP_COOLDOWN_MS` (5 s, just a settle time) and `PUMP_MAX_RUNS_PER_DAY`.
 - Anyone who joins the access point can trigger the pump. Change `AP_PASSWORD`.
 
 ## Mobile app

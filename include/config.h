@@ -52,11 +52,12 @@
 // ==========================================
 // How long the pump runs per watering, in milliseconds.
 #define PUMP_ON_DURATION_MS 5000
-// Minimum time between waterings. Soil needs a while to absorb water, and a
-// moisture reading only moves after that, so keep this in the minutes.
-#define PUMP_COOLDOWN_MS (2UL * 60UL * 1000UL)
+// Minimum time between waterings. Kept short so the user can water whenever
+// they like; it only gives the pump and relay a moment to settle. Raise it to
+// minutes if you ever let the planter water automatically.
+#define PUMP_COOLDOWN_MS 5000
 // Hard cap on waterings per rolling 24 h, in case a client goes haywire.
-#define PUMP_MAX_RUNS_PER_DAY 12
+#define PUMP_MAX_RUNS_PER_DAY 60
 // Independent hardware-timer failsafe: if loop() ever stalls, the relay is
 // still forced off this long after it was switched on.
 #define PUMP_FAILSAFE_MS (PUMP_ON_DURATION_MS + 1000)
