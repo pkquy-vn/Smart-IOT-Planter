@@ -6,7 +6,6 @@ export type Status = {
   moisture: number; // 0-100
   raw?: number; // raw ADC, for calibration
   temperature: number | null; // Celsius, null until the probe has a good reading
-  humidity: number | null; // percent; null when the planter has no humidity sensor
   pumpRunning: boolean;
   cooldownMs?: number; // 0 when a watering is allowed
   runsToday?: number;
@@ -26,7 +25,6 @@ async function mockStatus(): Promise<Status> {
   return {
     moisture: mockMoisture,
     temperature: 22 + Math.random(),
-    humidity: 48 + Math.round(Math.random() * 4),
     pumpRunning: Date.now() - lastWateredMock < PUMP_ON_MS,
     cooldownMs: mockCooldownLeft(),
     cameraReady: false,
@@ -62,7 +60,6 @@ export async function getStatus(cfg: PlanterConfig): Promise<Status> {
     ...s,
     moisture: Number(s.moisture) || 0,
     temperature: typeof s.temperature === 'number' ? s.temperature : null,
-    humidity: typeof s.humidity === 'number' ? s.humidity : null,
     pumpRunning: !!s.pumpRunning,
   };
 }

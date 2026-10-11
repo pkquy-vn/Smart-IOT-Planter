@@ -53,7 +53,9 @@ export default function Home() {
         ? `${Math.round((status.temperature * 9) / 5 + 32)}°`
         : `${status.temperature.toFixed(1)}°`
       : null;
-  const humidity = status?.humidity != null ? `${Math.round(status.humidity)}%` : null;
+  const lastWateredLabel = lastWatered
+    ? lastWatered.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+    : 'not yet';
   const sub = profile.species || PLANT_TYPES[profile.plantType].label;
   const loading = !status && !error;
   const streak = milestones(events, profile.since ?? now, now).happyStreak;
@@ -99,9 +101,9 @@ export default function Home() {
               <Text style={styles.smallFoot}>{config.fahrenheit ? 'Fahrenheit' : 'Celsius'}</Text>
             </View>
             <View style={[styles.tile, styles.smallTile]}>
-              <Text style={styles.smallLabel}>Air humidity</Text>
-              {loading ? <Skeleton width={70} height={30} color={P.mist} /> : <Text style={styles.smallValue}>{humidity ?? '--'}</Text>}
-              <Text style={styles.smallFoot}>{status && status.humidity == null ? 'No sensor on planter' : 'Around the plant'}</Text>
+              <Text style={styles.smallLabel}>Last watered</Text>
+              <Text style={styles.smallValue} numberOfLines={1} adjustsFontSizeToFit>{lastWateredLabel}</Text>
+              <Text style={styles.smallFoot}>{lastWatered ? 'From the journal' : 'Press the button below'}</Text>
             </View>
           </View>
         </View>
@@ -115,10 +117,6 @@ export default function Home() {
           />
         </View>
 
-        <Text style={styles.footer}>
-          Last watered:{' '}
-          {lastWatered ? lastWatered.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'not yet'}
-        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -148,5 +146,4 @@ const styles = StyleSheet.create({
   smallValue: { fontSize: 30, fontWeight: '900', color: P.ink },
   smallFoot: { color: P.mute, fontWeight: '600', fontSize: 12 },
 
-  footer: { textAlign: 'center', color: P.mute, fontSize: 13 },
 });
