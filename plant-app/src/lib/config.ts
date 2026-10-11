@@ -4,11 +4,11 @@ export const CONFIG = {
   USE_MOCK: false,
 
   // IP address of the ESP32 that reads the sensors + runs the pump.
-  // (Hardware teammates: print it in the Serial Monitor.)
-  SENSOR_BOARD_URL: 'http://172.20.10.5',
+  // In AP Mode (SmartPlanter_AP), the ESP32 is at 192.168.4.1
+  SENSOR_BOARD_URL: 'http://192.168.4.1',
 
-  // Camera board. Snapshot URL = a single JPEG; the app refreshes it a few times a second.
-  CAMERA_SNAPSHOT_URL: 'http://192.168.1.51/capture',
+  // Camera board snapshot URL. On our single-board setup, it's also at 192.168.4.1.
+  CAMERA_SNAPSHOT_URL: 'http://192.168.4.1/capture',
 
   POLL_MS: 2000,
   CAMERA_REFRESH_MS: 700,

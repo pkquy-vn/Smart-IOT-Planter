@@ -103,7 +103,7 @@ export function SetupScreen() {
               <Text style={styles.label}>Planter IP (sensors + pump)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="192.168.1.50"
+                placeholder="192.168.4.1"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="numbers-and-punctuation"
