@@ -15,6 +15,16 @@ Open it in Expo Go, a simulator, or the browser (`w`). The app works without har
 in **Demo mode** (fake sensor data). To use the real planter, switch demo mode off in
 setup, join the `SmartPlanter_AP` Wi-Fi network and keep the default IP `192.168.4.1`.
 
+## Put it on the planter
+
+```bash
+npm run build:planter
+```
+
+packs the web build into `../data/`. Then use PlatformIO's **Upload Filesystem Image**
+and open `http://192.168.4.1` on a phone connected to the planter's Wi-Fi. The Gaegu
+font ships as a Latin subset in `assets/fonts/` to keep the build small.
+
 ## Checks
 
 ```bash

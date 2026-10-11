@@ -1,4 +1,4 @@
-import { Gaegu_700Bold, useFonts } from '@expo-google-fonts/gaegu';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -13,7 +13,9 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { loaded, profile } = useSettings();
-  const [fontsLoaded, fontError] = useFonts({ Gaegu_700Bold });
+  // Latin subset of Gaegu Bold (72 KB instead of the 3 MB Google Fonts package), so the
+  // web build fits on the planter's flash. Regenerate with scripts/build-planter.mjs notes.
+  const [fontsLoaded, fontError] = useFonts({ Gaegu_700Bold: require('@/assets/fonts/Gaegu_700Bold.ttf') });
   // A font that fails to load falls back to the system font rather than blocking the app.
   const ready = loaded && (fontsLoaded || !!fontError);
 
