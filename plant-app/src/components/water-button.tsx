@@ -2,54 +2,52 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { CONFIG } from '@/lib/config';
 import { failure, success, tap } from '@/lib/haptics';
 import { P } from '@/lib/palette';
+import { PUMP_ON_MS } from '@/lib/pump';
 
-type Phase = 'idle' | 'sending' | 'pumping' | 'cooldown';
+type Phase = 'idle' | 'sending' | 'pumping';
 
-// Counts down `ms`, reporting whole seconds left, then calls `done`. Returns a cancel function.
-function startCountdown(ms: number, tick: (seconds: number) => void, done: () => void) {
-  const end = Date.now() + ms;
-  tick(Math.ceil(ms / 1000));
-  const id = setInterval(() => {
-    const remaining = end - Date.now();
-    if (remaining <= 0) {
-      clearInterval(id);
-      done();
-    } else {
-      tick(Math.ceil(remaining / 1000));
-    }
-  }, 250);
-  return () => clearInterval(id);
-}
+// 125000 ms -> "2:05", 9000 -> "9s"
+const formatWait = (ms: number) => {
+  const s = Math.ceil(ms / 1000);
+  return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+};
 
-// Big "Water plant" button that shows the pump running, then a cooldown countdown.
-// `pumpRunning` comes from the planter, so it also lights up when the pump was started elsewhere.
+// Big "Water plant" button that shows the pump running, then the planter's cooldown.
+// `pumpRunning` and `cooldownUntil` come from the planter, so they also reflect waterings started elsewhere.
 // `soaked` asks for a second tap first, since a pump run can't be undone.
 export function WaterButton({
   onWater,
   pumpRunning = false,
+  cooldownUntil = 0,
   soaked = false,
 }: {
   onWater: () => Promise<void>;
   pumpRunning?: boolean;
+  cooldownUntil?: number; // epoch ms
   soaked?: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [confirming, setConfirming] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(0);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [progress] = useState(() => new Animated.Value(0));
-  const cancel = useRef<(() => void) | null>(null);
+  const pumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stop any running countdown if the screen goes away
-  useEffect(() => () => cancel.current?.(), []);
+  // Stop the pumping timer if the screen goes away
+  useEffect(
+    () => () => {
+      if (pumpTimer.current) clearTimeout(pumpTimer.current);
+    },
+    [],
+  );
 
-  const countdown = (ms: number, next: () => void) => {
-    cancel.current?.();
-    cancel.current = startCountdown(ms, setSecondsLeft, next);
-  };
+  // Tick the cooldown countdown while there is one.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
 
   const press = () => {
     if (phase !== 'idle' || pumpRunning) return;
@@ -70,9 +68,9 @@ export function WaterButton({
 
     try {
       await onWater();
-    } catch (e: any) {
+    } catch (e: unknown) {
       failure();
-      setNote({ ok: false, text: e?.message ?? 'Could not water :(' });
+      setNote({ ok: false, text: e instanceof Error ? e.message : 'Could not water :(' });
       setPhase('idle');
       return;
     }
@@ -80,34 +78,12 @@ export function WaterButton({
     success();
     setPhase('pumping');
     progress.setValue(0);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: CONFIG.PUMP_ON_MS,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-
-    countdown(CONFIG.PUMP_ON_MS, () => {
+    Animated.timing(progress, { toValue: 1, duration: PUMP_ON_MS, easing: Easing.linear, useNativeDriver: false }).start();
+    pumpTimer.current = setTimeout(() => {
       setNote({ ok: true, text: 'Watered!' });
-      setPhase('cooldown');
-      countdown(CONFIG.PUMP_COOLDOWN_MS, () => setPhase('idle'));
-    });
+      setPhase('idle');
+    }, PUMP_ON_MS);
   };
-
-  const autoRunning = phase === 'idle' && pumpRunning;
-  const label =
-    phase === 'sending'
-      ? 'Starting pump…'
-      : phase === 'pumping'
-        ? `Watering… ${secondsLeft}s`
-        : phase === 'cooldown'
-          ? `Ready again in ${secondsLeft}s`
-          : autoRunning
-            ? 'Pump is running…'
-            : 'Water plant';
-  const cooling = phase === 'cooldown';
-  const disabled = phase !== 'idle' || pumpRunning;
-  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   if (confirming) {
     return (
@@ -126,6 +102,23 @@ export function WaterButton({
     );
   }
 
+  const waitMs = cooldownUntil - now;
+  const cooling = phase === 'idle' && !pumpRunning && waitMs > 0;
+  const busyElsewhere = phase === 'idle' && pumpRunning;
+  const label =
+    phase === 'sending'
+      ? 'Starting pump…'
+      : phase === 'pumping'
+        ? 'Watering…'
+        : busyElsewhere
+          ? 'Pump is running…'
+          : cooling
+            ? `Next watering in ${formatWait(waitMs)}`
+            : 'Water plant';
+  const muted = cooling || busyElsewhere;
+  const disabled = phase !== 'idle' || pumpRunning || cooling;
+  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -133,14 +126,10 @@ export function WaterButton({
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={{ disabled, busy: phase === 'sending' || phase === 'pumping' || autoRunning }}
-        style={({ pressed }) => [
-          styles.button,
-          (cooling || autoRunning) && styles.buttonCooling,
-          pressed && { transform: [{ scale: 0.98 }] },
-        ]}>
+        accessibilityState={{ disabled, busy: phase !== 'idle' || busyElsewhere }}
+        style={({ pressed }) => [styles.button, muted && styles.buttonCooling, pressed && { transform: [{ scale: 0.98 }] }]}>
         {phase === 'pumping' && <Animated.View style={[styles.fill, { width }]} />}
-        <Text style={[styles.text, (cooling || autoRunning) && styles.textCooling]}>{label}</Text>
+        <Text style={[styles.text, muted && styles.textCooling]}>{label}</Text>
       </Pressable>
       {note && <Text style={[styles.note, { color: note.ok ? P.fern : P.alert }]}>{note.text}</Text>}
     </View>
@@ -155,9 +144,9 @@ const styles = StyleSheet.create({
   },
   buttonCooling: { backgroundColor: P.sage },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: P.fern },
-  text: { color: P.white, fontSize: 18, fontWeight: '800' },
+  text: { color: P.white, fontSize: 18 },
   textCooling: { color: P.forest },
-  note: { textAlign: 'center', fontWeight: '700' },
+  note: { textAlign: 'center' },
   confirm: { backgroundColor: P.white, borderRadius: 26, padding: 16, gap: 6, borderWidth: 2, borderColor: P.sage },
   confirmTitle: { color: P.ink, fontSize: 17, textAlign: 'center' },
   confirmText: { color: P.mute, fontSize: 14, textAlign: 'center' },

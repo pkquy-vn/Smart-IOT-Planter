@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,9 +18,8 @@ export function SetupScreen() {
 
   const start = () => {
     const p = { ...form, name: form.name.trim() };
+    // The root layout swaps onboarding for the tabs as soon as the profile is saved, landing on Home.
     save(p);
-    // Land on Home, even if setup was opened from another tab (e.g. "Start over" in Settings).
-    router.navigate('/');
   };
 
   return (

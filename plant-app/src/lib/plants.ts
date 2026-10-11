@@ -1,4 +1,4 @@
-import { CONFIG } from './config';
+import { ML_PER_PRESS, PUMP_ON_MS } from './pump';
 
 // Broad plant groups with typical care. These are rough starting points, not rules:
 // the moisture sensor is still the best guide for when to water.
@@ -64,17 +64,17 @@ export type Recommendation = {
 };
 
 // How many presses of the Water button make one proper watering.
-// One press runs the pump for CONFIG.PUMP_ON_MS (5 s) and moves about CONFIG.ML_PER_PRESS of water.
+// One press runs the pump for PUMP_ON_MS (5 s) and moves about ML_PER_PRESS of water.
 export function recommend(type: PlantTypeId): Recommendation {
   const t = PLANT_TYPES[type];
   const ml = t.ml;
-  const presses = Math.max(1, Math.round(ml / CONFIG.ML_PER_PRESS));
+  const presses = Math.max(1, Math.round(ml / ML_PER_PRESS));
   return {
     ml,
     presses,
     everyDays: t.everyDays,
     pressesPerWeek: Math.max(1, Math.round((presses * 7) / t.everyDays)),
-    secondsPerPress: CONFIG.PUMP_ON_MS / 1000,
+    secondsPerPress: PUMP_ON_MS / 1000,
   };
 }
 

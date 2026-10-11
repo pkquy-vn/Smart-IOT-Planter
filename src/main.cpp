@@ -7,15 +7,17 @@
 void setup() {
     Serial.begin(115200);
     delay(2000);
-    
+
     Serial.println("===================================");
     Serial.println("Smart Planter Booting...");
     Serial.println("===================================");
 
-    // Initialize the hardware modules
-    initSensors();
-    initCamera();
+    // Pump first so the relay is driven OFF as early as possible.
     pumpBegin();
+    initSensors();
+    if (!initCamera()) {
+        Serial.println("Continuing without the camera. /status reports cameraReady=false.");
+    }
     initServer();
 }
 
@@ -27,7 +29,9 @@ void loop() {
     static unsigned long lastLog = 0;
     if (millis() - lastLog >= 2000) {
         lastLog = millis();
-        Serial.printf("Moisture: %d%% (raw %d)  Temp: %.1f C  Humidity: %.0f%%\n",
-                      getMoisturePercentage(), getMoistureRaw(), getTemperatureC(), getHumidity());
+        Serial.printf("Moisture: %d%% (raw %d)  Temp: %.1f C%s  Pump: %s\n",
+                      getMoisturePercentage(), getMoistureRaw(), getTemperatureC(),
+                      temperatureProbeFound() ? "" : " (no DS18B20 found)",
+                      pumpIsRunning() ? "ON" : "off");
     }
 }

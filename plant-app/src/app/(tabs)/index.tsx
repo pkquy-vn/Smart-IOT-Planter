@@ -6,39 +6,23 @@ import { MoistureRing } from '@/components/moisture-ring';
 import { OfflineCard } from '@/components/offline-card';
 import { Skeleton } from '@/components/skeleton';
 import { SplashBurst } from '@/components/splash-burst';
-import { Sprout, sproutMoodFor } from '@/components/sprout';
+import { Sprout } from '@/components/sprout';
 import { Text } from '@/components/text';
 import { WaterButton } from '@/components/water-button';
 import { WeekCard } from '@/components/week-card';
 import { useNow } from '@/hooks/use-now';
-import { CONFIG } from '@/lib/config';
 import { P } from '@/lib/palette';
 import { PLANT_TYPES } from '@/lib/plants';
-import { useSettings } from '@/lib/settings';
 import { milestones } from '@/lib/milestones';
+import { moistureLabel, moodMessage, sproutMoodFor } from '@/lib/mood';
+import { useSettings } from '@/lib/settings';
 import { useStatus } from '@/lib/status';
 import { useTourScroller, useTourTarget } from '@/lib/tour';
 
-function moistureLabel(m: number) {
-  if (m < CONFIG.DRY_BELOW) return 'Thirsty';
-  if (m > CONFIG.TOO_WET) return 'Too wet';
-  if (m > CONFIG.WET_ABOVE) return 'Soaked';
-  return 'Happy';
-}
-
-const MOOD_MSG = {
-  joy: 'Ahh, so refreshing!',
-  sad: 'Please water me…',
-  thirsty: 'I need a drink!',
-  wet: 'Whoa, that’s a lot of water!',
-  happy: 'Feeling great!',
-  ok: 'Just hanging out',
-};
-
 // Home: how the plant is doing right now, this week at a glance, and the Water button.
 export default function Home() {
-  const { profile, events } = useSettings();
-  const { status, error, retry, water, splash } = useStatus();
+  const { profile, config, events } = useSettings();
+  const { status, error, retry, water, cooldownUntil, splash } = useStatus();
   const now = useNow();
   const scrollRef = useRef<ScrollView>(null);
   useTourScroller(useCallback((y: number) => scrollRef.current?.scrollTo({ y, animated: true }), []));
@@ -58,14 +42,14 @@ export default function Home() {
   const mood = sproutMoodFor(
     moisture,
     hoursSinceWater,
-    CONFIG.DRY_BELOW,
-    CONFIG.WET_ABOVE,
+    config.dryBelow,
+    config.wetAbove,
     PLANT_TYPES[profile.plantType].everyDays * 24,
-    CONFIG.TOO_WET,
+    config.tooWet,
   );
   const temp =
     status?.temperature != null
-      ? CONFIG.FAHRENHEIT
+      ? config.fahrenheit
         ? `${Math.round((status.temperature * 9) / 5 + 32)}°`
         : `${status.temperature.toFixed(1)}°`
       : null;
@@ -86,25 +70,25 @@ export default function Home() {
           <Sprout size={200} mood={mood} />
           <SplashBurst trigger={splash} />
           {streak >= 2 && !error && <Text style={styles.streak}>{streak} happy days in a row</Text>}
-          <Text style={styles.moodMsg}>{error ? 'Zzz… I can’t find the planter' : status?.pumpRunning ? 'Glug glug glug…' : MOOD_MSG[mood]}</Text>
+          <Text style={styles.moodMsg}>{error ? 'Zzz… I can’t find the planter' : status?.pumpRunning ? 'Glug glug glug…' : moodMessage[mood]}</Text>
         </View>
 
         <View {...tourWeek}>
           <WeekCard />
         </View>
 
-        {error && <OfflineCard onRetry={retry} hasOldReadings={!!status} />}
+        {error && <OfflineCard onRetry={retry} hasOldReadings={!!status} boardUrl={config.boardUrl} />}
 
         <View style={styles.row}>
           <View style={[styles.tile, styles.moistTile]}>
             <Text style={styles.tileLabel}>Soil moisture</Text>
             <View style={{ alignItems: 'center', paddingVertical: 4 }}>
-              <MoistureRing value={moisture} dryBelow={CONFIG.DRY_BELOW} size={112} />
+              <MoistureRing value={moisture} dryBelow={config.dryBelow} size={112} />
             </View>
             {loading ? (
               <Skeleton width="60%" height={14} style={{ alignSelf: 'center' }} />
             ) : (
-              <Text style={styles.tileFoot}>{moisture != null ? moistureLabel(moisture) : 'No reading'}</Text>
+              <Text style={styles.tileFoot}>{moisture != null ? moistureLabel(moisture, config.dryBelow, config.wetAbove, config.tooWet) : 'No reading'}</Text>
             )}
           </View>
 
@@ -112,7 +96,7 @@ export default function Home() {
             <View style={[styles.tile, styles.smallTile]}>
               <Text style={styles.smallLabel}>Temperature</Text>
               {loading ? <Skeleton width={70} height={30} color={P.mist} /> : <Text style={styles.smallValue}>{temp ?? '--'}</Text>}
-              <Text style={styles.smallFoot}>{CONFIG.FAHRENHEIT ? 'Fahrenheit' : 'Celsius'}</Text>
+              <Text style={styles.smallFoot}>{config.fahrenheit ? 'Fahrenheit' : 'Celsius'}</Text>
             </View>
             <View style={[styles.tile, styles.smallTile]}>
               <Text style={styles.smallLabel}>Air humidity</Text>
@@ -123,7 +107,12 @@ export default function Home() {
         </View>
 
         <View {...tourWater}>
-          <WaterButton onWater={water} pumpRunning={!!status?.pumpRunning} soaked={moisture != null && moisture > CONFIG.WET_ABOVE} />
+          <WaterButton
+            onWater={water}
+            pumpRunning={!!status?.pumpRunning}
+            cooldownUntil={cooldownUntil}
+            soaked={moisture != null && moisture > config.wetAbove}
+          />
         </View>
 
         <Text style={styles.footer}>

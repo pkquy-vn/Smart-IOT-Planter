@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
-import { CONFIG } from '@/lib/config';
 import { P } from '@/lib/palette';
 
 // Shown on Home when the planter stops answering: what to check, and a button to try again.
-export function OfflineCard({ onRetry, hasOldReadings }: { onRetry: () => Promise<void>; hasOldReadings: boolean }) {
+export function OfflineCard({ onRetry, hasOldReadings, boardUrl }: { onRetry: () => Promise<void>; hasOldReadings: boolean; boardUrl: string }) {
   const [checking, setChecking] = useState(false);
-  const ip = CONFIG.SENSOR_BOARD_URL.replace(/^https?:\/\//, '');
+  const ip = boardUrl.replace(/^https?:\/\//, '');
 
   const retry = async () => {
     setChecking(true);

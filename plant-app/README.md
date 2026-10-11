@@ -1,56 +1,37 @@
-# Welcome to your Expo app 👋
+# Smart Planter app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo / React Native companion app for the ESP32-S3 Smart Planter. Shows the plant's
+mood, soil moisture, temperature, humidity and a live camera view, waters the plant,
+and keeps a watering journal.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Open it in Expo Go, a simulator, or the browser (`w`). The app works without hardware
+in **Demo mode** (fake sensor data). To use the real planter, switch demo mode off in
+setup, join the `SmartPlanter_AP` Wi-Fi network and keep the default IP `192.168.4.1`.
 
-### Other setup steps
+## Checks
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # expo lint (React Compiler rules included)
+npm test            # jest, unit tests in src/lib/__tests__
+```
 
-## Learn more
+## Layout
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Path | Role |
+|---|---|
+| `src/app/_layout.tsx` | root stack; routes to onboarding until a plant profile is saved |
+| `src/app/onboarding.tsx` | intro and setup screens |
+| `src/app/(tabs)/` | Home dashboard and Journal calendar |
+| `src/components/` | UI pieces (sprout, plant balls, tab bars, setup form) |
+| `src/lib/api.ts` | HTTP client for the board, plus the demo-mode mock |
+| `src/lib/config.ts` | turns the saved profile into URLs and thresholds |
+| `src/lib/mood.ts` | pure mood logic for the big sprout |
+| `src/lib/settings.tsx` | persisted profile, journal events and derived config |

@@ -1,12 +1,10 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, View } from 'react-native';
 
 import { Text } from '@/components/text';
+import type { SproutMood } from '@/lib/mood';
 import { P } from '@/lib/palette';
-
-// joy = freshly soaked (happy face, bouncing); wet = too much water.
-export type SproutMood = 'joy' | 'happy' | 'ok' | 'sad' | 'wet' | 'thirsty';
 
 const ART = {
   joy: require('@/assets/images/sprout/happy.png'),
@@ -59,24 +57,3 @@ export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mo
   );
 }
 
-// `sadAfterHours` comes from the plant type (e.g. 3 days for herbs, 14 for cacti),
-// so a cactus isn't sad just because it hasn't been watered for two days.
-// Nicely soaked (above wetAbove) is pure joy; only past tooWet is it too much.
-export function sproutMoodFor(
-  moisturePct: number | null,
-  hoursSinceWater: number | null,
-  dryBelow: number,
-  wetAbove: number,
-  sadAfterHours = 48,
-  tooWet = 100,
-): SproutMood {
-  if (moisturePct == null) return 'ok';
-  if (moisturePct < dryBelow) return 'thirsty';
-  if (hoursSinceWater != null && hoursSinceWater > sadAfterHours && moisturePct < dryBelow + 10) return 'sad';
-  if (moisturePct > tooWet) return 'wet';
-  if (moisturePct > wetAbove) return 'joy';
-  if (moisturePct < dryBelow + 10) return 'ok';
-  return 'happy';
-}
-
-export const _styles = StyleSheet.create({});

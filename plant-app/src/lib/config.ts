@@ -1,35 +1,53 @@
-// One place for everything the hardware team might change.
-export const CONFIG = {
-  // Set to false once the ESP32 is serving real data.
-  USE_MOCK: false,
+import { PLANT_TYPES, type Units } from './plants';
+import type { Profile } from './profile';
 
-  // IP address of the ESP32 that reads the sensors + runs the pump.
-  // In AP Mode (SmartPlanter_AP), the ESP32 is at 192.168.4.1
-  SENSOR_BOARD_URL: 'http://192.168.4.1',
+// The ESP32 runs its own access point and always answers at this address.
+export const DEFAULT_PLANTER_IP = '192.168.4.1';
 
-  // Camera board snapshot URL. On our single-board setup, it's also at 192.168.4.1.
-  CAMERA_SNAPSHOT_URL: 'http://192.168.4.1/capture',
+// Fixed tuning knobs. Anything the user can change lives in the Profile and is
+// turned into a PlanterConfig by configFor() below. Pump numbers live in pump.ts.
+export const POLL_MS = 2000;
+export const CAMERA_REFRESH_MS = 1500;
+export const REQUEST_TIMEOUT_MS = 5000;
 
-  POLL_MS: 2000,
-  CAMERA_REFRESH_MS: 700,
+// Moisture history for the chart: one reading every 10 min, kept for 7 days
+export const HISTORY_SAMPLE_MS = 10 * 60 * 1000;
+export const HISTORY_DAYS = 7;
 
-  // Must match PUMP_ON_DURATION_MS / PUMP_COOLDOWN_MS in the firmware's config.h
-  PUMP_ON_MS: 5000,
-  PUMP_COOLDOWN_MS: 10000,
+// How far above "soaked" counts as too much water.
+export const TOO_WET_GAP = 15;
 
-  // Roughly how much water one 5-second pump run moves. Fixed by the hardware;
-  // measure it once with a measuring cup and update this so the care guide is accurate.
-  ML_PER_PRESS: 120,
-
-  // Moisture history for the chart: one reading every 10 min, kept for 7 days
-  HISTORY_SAMPLE_MS: 10 * 60 * 1000,
-  HISTORY_DAYS: 7,
-
-  // Moisture thresholds (percent) for the status colors.
-  DRY_BELOW: 30,
-  WET_ABOVE: 70, // above this the soil is nicely soaked (the plant is thrilled)
-  TOO_WET: 85, // above this it's too much water
-
-  // Temperature unit shown in the app. The board should send Celsius.
-  FAHRENHEIT: true,
+export type PlanterConfig = {
+  useMock: boolean;
+  boardUrl: string; // http://host, no trailing slash
+  cameraSnapshotUrl: string; // full URL of the JPEG endpoint
+  dryBelow: number; // percent: thirsty below this
+  wetAbove: number; // percent: nicely soaked above this
+  tooWet: number; // percent: too much water above this
+  units: Units;
+  fahrenheit: boolean;
 };
+
+export const withHttp = (host: string) => (host.startsWith('http') ? host : `http://${host}`).replace(/\/$/, '');
+
+// Pure: the same profile always gives the same config, so components can derive
+// it with useMemo and re-render when the profile changes.
+export function configFor(p: Profile): PlanterConfig {
+  const type = PLANT_TYPES[p.plantType] ?? PLANT_TYPES.leafy;
+  const sensorHost = p.sensorIp.trim() || DEFAULT_PLANTER_IP;
+  const cameraHost = p.cameraIp.trim() || sensorHost;
+  // The thirsty level comes from the plant type unless the user set their own in Settings.
+  const dry = parseInt(p.thirstyBelow, 10);
+  const dryBelow = Number.isFinite(dry) ? Math.min(Math.max(dry, 0), 90) : type.dryBelow;
+  const wetAbove = Math.max(type.wetAbove, dryBelow + 15);
+  return {
+    useMock: p.useMock,
+    boardUrl: withHttp(sensorHost),
+    cameraSnapshotUrl: `${withHttp(cameraHost)}/capture`,
+    dryBelow,
+    wetAbove,
+    tooWet: wetAbove + TOO_WET_GAP,
+    units: p.units,
+    fahrenheit: p.units === 'imperial',
+  };
+}

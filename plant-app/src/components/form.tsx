@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/text';
 import { P } from '@/lib/palette';
-import { withHttp, type Profile } from '@/lib/settings';
+import { probeBoard } from '@/lib/api';
+import { DEFAULT_PLANTER_IP, withHttp } from '@/lib/config';
+import type { Profile } from '@/lib/profile';
 
 // Shared bits for the setup screen and the Settings page.
 
@@ -38,17 +40,12 @@ export function ConnectionFields({ form, set }: { form: Profile; set: SetField }
     if (!form.sensorIp.trim()) return setTestMsg({ ok: false, text: 'Enter the planter IP first.' });
     setTesting(true);
     setTestMsg(null);
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
     try {
-      const res = await fetch(`${withHttp(form.sensorIp.trim())}/status`, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
-      setTestMsg({ ok: true, text: `Connected! Moisture ${Math.round(data.moisture)}%` });
+      const data = await probeBoard(withHttp(form.sensorIp.trim()));
+      setTestMsg({ ok: true, text: `Connected! Moisture ${Math.round(data.moisture)}%${data.cameraReady === false ? ' (no camera)' : ''}` });
     } catch {
       setTestMsg({ ok: false, text: "Couldn't connect. Same Wi-Fi as the planter? Is the IP right?" });
     } finally {
-      clearTimeout(timer);
       setTesting(false);
     }
   };
@@ -61,7 +58,7 @@ export function ConnectionFields({ form, set }: { form: Profile; set: SetField }
         value={form.useMock}
         onChange={(v) => {
           set('useMock', v);
-          if (!v && !form.sensorIp.trim()) set('sensorIp', '192.168.4.1');
+          if (!v && !form.sensorIp.trim()) set('sensorIp', DEFAULT_PLANTER_IP);
         }}
       />
 
@@ -70,7 +67,7 @@ export function ConnectionFields({ form, set }: { form: Profile; set: SetField }
           <Text style={f.label}>Planter IP (sensors + pump)</Text>
           <TextInput
             style={f.input}
-            placeholder="192.168.4.1"
+            placeholder={DEFAULT_PLANTER_IP}
             placeholderTextColor={P.muteLight}
             autoCapitalize="none"
             autoCorrect={false}

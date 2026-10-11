@@ -1,6 +1,3 @@
-#ifndef SERVER_H
-#define SERVER_H
+#pragma once
 
 void initServer();
-
-#endif
