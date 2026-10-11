@@ -29,8 +29,9 @@ void loop() {
     static unsigned long lastLog = 0;
     if (millis() - lastLog >= 2000) {
         lastLog = millis();
-        Serial.printf("Moisture: %d%% (raw %d)  Temp: %.1f C  Humidity: %.0f%%  Pump: %s\n",
-                      getMoisturePercentage(), getMoistureRaw(), getTemperatureC(), getHumidity(),
+        Serial.printf("Moisture: %d%% (raw %d)  Temp: %.1f C%s  Pump: %s\n",
+                      getMoisturePercentage(), getMoistureRaw(), getTemperatureC(),
+                      temperatureProbeFound() ? "" : " (no DS18B20 found)",
                       pumpIsRunning() ? "ON" : "off");
     }
 }

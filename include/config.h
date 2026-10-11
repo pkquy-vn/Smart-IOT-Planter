@@ -17,11 +17,12 @@
 //
 // NOTE: GPIO3 is a strapping pin (JTAG select). It works fine as an ADC input,
 // but if the board ever boots strangely with the probe attached, swap the soil
-// sensor to GPIO1 or GPIO2 and move the DHT / relay to a non-ADC pin (14, 21).
+// sensor to GPIO1 or GPIO2 and move the temperature probe / relay to a non-ADC pin (14, 21).
 #define SOIL_MOISTURE_PIN 3 // ADC1_CH2
 
-// Digital pin for the DHT11 / DHT22 sensor
-#define DHT_PIN 1
+// 1-Wire data pin for the DS18B20 temperature probe (needs a 4.7k pull-up to 3V3;
+// the kit's adapter board already has one).
+#define TEMP_SENSOR_PIN 1
 
 // Digital pin for the 5V relay controlling the water pump.
 // Hardware tip: the pin floats until setup() runs, so put a 10k pull-down
@@ -35,15 +36,11 @@
 // ==========================================
 // Sensors
 // ==========================================
-// DHT sensor type. The values are the ones the Adafruit library uses, so a
-// future switch back to that library needs no changes here.
-#define DHT11 11
-#define DHT22 22
-#define DHT_TYPE DHT11
-// #define DHT_TYPE DHT22   // AM2302
-
-// How often the cached readings are refreshed. The DHT11 needs >= 2 s between reads.
+// How often the cached readings are refreshed. A 12-bit DS18B20 conversion takes
+// up to 750 ms; the driver starts one each cycle and reads it on the next.
 #define SENSOR_INTERVAL_MS 2500
+// DS18B20 resolution in bits (9-12). 12 = 0.0625 C steps, 750 ms conversion.
+#define TEMP_RESOLUTION_BITS 12
 
 // Soil moisture calibration (raw ADC, 0-4095). Read "raw" from /status with the
 // probe in dry air and then in a cup of water, and put those two numbers here.

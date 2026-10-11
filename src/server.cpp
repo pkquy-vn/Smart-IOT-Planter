@@ -40,7 +40,6 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   <div class="stats">
     <div class="card"><div class="label">Soil moisture</div><div class="val" id="moist">--%</div></div>
     <div class="card"><div class="label">Temperature</div><div class="val" id="temp">--</div></div>
-    <div class="card"><div class="label">Humidity</div><div class="val" id="hum">--</div></div>
   </div>
   <button id="wbtn" onclick="water()">Water plant</button>
   <div id="msg"></div>
@@ -58,7 +57,6 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
       const d = await (await fetch('/status')).json();
       $('moist').innerText = d.moisture + '%';
       $('temp').innerText = d.temperature == null ? '--' : d.temperature.toFixed(1) + ' °C';
-      $('hum').innerText = d.humidity == null ? '--' : Math.round(d.humidity) + '%';
       $('wbtn').disabled = d.pumpRunning;
       if (d.pumpRunning) $('msg').innerText = 'Watering…';
       else if (d.cooldownMs > 0) $('msg').innerText = 'Next watering in ' + Math.ceil(d.cooldownMs/1000) + ' s';
@@ -115,7 +113,6 @@ void initServer() {
     // GET /status : everything the app needs in one call
     server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         float t = getTemperatureC();
-        float h = getHumidity();
 
         String json;
         json.reserve(192);
@@ -125,8 +122,8 @@ void initServer() {
         json += getMoistureRaw();
         json += ",\"temperature\":";
         if (isnan(t)) json += "null"; else json += String(t, 1);
-        json += ",\"humidity\":";
-        if (isnan(h)) json += "null"; else json += String(h, 0);
+        json += ",\"temperatureProbe\":";
+        json += temperatureProbeFound() ? "true" : "false";
         json += ",\"pumpRunning\":";
         json += pumpIsRunning() ? "true" : "false";
         json += ",\"cooldownMs\":";
