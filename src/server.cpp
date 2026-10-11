@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <memory>
 #include <WiFi.h>
-#include <LittleFS.h>
 #include <ESPAsyncWebServer.h>
 #include "config.h"
 #include "server.h"
@@ -11,11 +10,8 @@
 
 static AsyncWebServer server(80);
 
-// The full mobile app (built with `npm run build:planter`) lives on the LittleFS
-// partition and is served at /. This small built-in dashboard is the fallback
-// when the filesystem is empty, and is always available at /basic.
-static bool appInstalled = false;
-
+// The dashboard lives in flash (PROGMEM) and is streamed straight from there,
+// so no 3 KB String is built per request. Edit it like a normal HTML file.
 static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,18 +81,6 @@ static void sendJson(AsyncWebServerRequest *request, int code, const String &jso
     request->send(code, "application/json", json);
 }
 
-static void sendBasicDashboard(AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response =
-        request->beginResponse(200, "text/html", (const uint8_t *)INDEX_HTML, sizeof(INDEX_HTML) - 1);
-    request->send(response);
-}
-
-// True for browser navigations (no file extension), false for assets and API calls.
-static bool looksLikePageRoute(const String &url) {
-    int lastSlash = url.lastIndexOf('/');
-    return url.indexOf('.', lastSlash) < 0;
-}
-
 void initServer() {
     Serial.print("\n-> Starting Access Point: ");
     Serial.println(AP_SSID);
@@ -119,26 +103,12 @@ void initServer() {
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
 
-    // The web app on LittleFS. `build-planter.mjs` gzips js/css/html, and the
-    // static handler serves `<file>.gz` with Content-Encoding automatically.
-    if (LittleFS.begin(false)) {
-        appInstalled = LittleFS.exists("/index.html.gz") || LittleFS.exists("/index.html");
-        Serial.printf("LittleFS mounted, web app %s.\n", appInstalled ? "installed" : "not found (run npm run build:planter)");
-    } else {
-        Serial.println("LittleFS not mounted: no filesystem image uploaded yet. Serving the basic dashboard.");
-    }
-
-    // GET /basic : the small built-in dashboard, always available
-    server.on("/basic", HTTP_GET, sendBasicDashboard);
-
-    if (appInstalled) {
-        // Hashed bundles and assets can be cached forever; the HTML entry points cannot.
-        server.serveStatic("/_expo/", LittleFS, "/_expo/").setCacheControl("max-age=31536000, immutable");
-        server.serveStatic("/assets/", LittleFS, "/assets/").setCacheControl("max-age=31536000, immutable");
-        server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html").setCacheControl("no-cache");
-    } else {
-        server.on("/", HTTP_GET, sendBasicDashboard);
-    }
+    // GET / : the dashboard, served from flash
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response =
+            request->beginResponse(200, "text/html", (const uint8_t *)INDEX_HTML, sizeof(INDEX_HTML) - 1);
+        request->send(response);
+    });
 
     // GET /status : everything the app needs in one call
     server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -209,23 +179,13 @@ void initServer() {
         request->send(response);
     });
 
-    // CORS preflight, client-side routes of the web app, and 404s
+    // CORS preflight and 404s
     server.onNotFound([](AsyncWebServerRequest *request) {
         if (request->method() == HTTP_OPTIONS) {
             request->send(204);
-            return;
+        } else {
+            request->send(404, "text/plain", "Not found");
         }
-        // /calendar, /settings, ... are rendered by the app itself: hand it index.html.
-        if (appInstalled && request->method() == HTTP_GET && looksLikePageRoute(request->url())) {
-            String page = request->url() + ".html.gz";
-            if (LittleFS.exists(page)) {
-                request->send(LittleFS, page, "text/html");
-            } else {
-                request->send(LittleFS, "/index.html.gz", "text/html");
-            }
-            return;
-        }
-        request->send(404, "text/plain", "Not found");
     });
 
     server.begin();

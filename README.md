@@ -45,28 +45,11 @@ glass of water, and put the two numbers into `MOISTURE_RAW_DRY` and `MOISTURE_RA
 | yellow / white (DATA) | GPIO1, with a 4.7k resistor to 3V3 (already on the kit's adapter board) |
 | black (GND) | GND |
 
-### The planter hosts the app
-
-The ESP32 serves the full mobile app from its LittleFS partition, so any phone on the
-`SmartPlanter_AP` network can open `http://192.168.4.1` and use it without a laptop,
-Expo Go or an app store.
-
-1. In `plant-app/`: `npm install` then `npm run build:planter`. This exports the web
-   build and packs it, gzipped, into `data/` (about 1.3 MB).
-2. In PlatformIO: **Upload Filesystem Image** (Project Tasks > Platform). Do this again
-   whenever the app changes. The firmware itself does not need re-flashing for that.
-3. Open `http://192.168.4.1` on the phone. The small built-in dashboard stays at
-   `http://192.168.4.1/basic`, and is what `/` shows when no image has been uploaded.
-
-The partition table (`partitions_8MB_app_fs.csv`) gives the app 3 MB and the filesystem
-about 4.9 MB. The first firmware upload after switching to it re-partitions the flash.
-
 ### HTTP API
 
 | Method | Path | Response |
 |---|---|---|
-| GET | `/` | the mobile app (web build) when uploaded, else the built-in dashboard |
-| GET | `/basic` | the small built-in dashboard |
+| GET | `/` | browser dashboard |
 | GET | `/status` | `{ moisture, raw, temperature, temperatureProbe, pumpRunning, cooldownMs, runsToday, cameraReady, uptimeMs }` (`temperature` is `null` until the probe answers; `temperatureProbe` is false when no DS18B20 is detected) |
 | POST | `/water` | `{ ok: true }`, or HTTP 429 with `{ ok: false, error, cooldownMs }` while the pump is busy, cooling down or capped for the day |
 | GET | `/capture` | latest JPEG frame, or 503 if the camera is not available |
