@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { CONFIG } from './config';
 import { dayKey, seedHistory, type PlantEvent } from './dates';
@@ -27,7 +28,12 @@ const DEFAULT: Profile = {
   cameraIp: '',
 };
 
+// Everything we persist, under a single key.
+const STORAGE_KEY = 'plant-app:v1';
+type Saved = { profile: Profile; introSeen: boolean; events: PlantEvent[] };
+
 type Ctx = {
+  loaded: boolean; // false until saved data has been read from storage
   profile: Profile;
   save: (p: Profile) => void;
   editPlant: () => void;
@@ -54,9 +60,35 @@ function applyToConfig(p: Profile) {
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [loaded, setLoaded] = useState(false);
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [introSeen, setIntroSeen] = useState(false);
   const [events, setEvents] = useState<PlantEvent[]>([]);
+
+  // Read saved state once at startup.
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved = JSON.parse(raw) as Partial<Saved>;
+        if (saved.profile) {
+          const p = { ...DEFAULT, ...saved.profile };
+          applyToConfig(p);
+          setProfile(p);
+        }
+        if (saved.introSeen) setIntroSeen(true);
+        if (Array.isArray(saved.events)) setEvents(saved.events);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  // Write whenever anything changes. Skipped until the first read finishes,
+  // so defaults never overwrite real saved data.
+  useEffect(() => {
+    if (!loaded) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ profile, introSeen, events })).catch(() => {});
+  }, [loaded, profile, introSeen, events]);
 
   const save = (p: Profile) => {
     applyToConfig(p);
@@ -73,7 +105,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     );
   const editPlant = () => setProfile((p) => ({ ...p, setupDone: false }));
 
-  return <SettingsContext.Provider value={{ profile, save, editPlant, introSeen, setIntroSeen, events, addEvent, logOncePerDay }}>{children}</SettingsContext.Provider>;
+  return (
+    <SettingsContext.Provider value={{ loaded, profile, save, editPlant, introSeen, setIntroSeen, events, addEvent, logOncePerDay }}>
+      {children}
+    </SettingsContext.Provider>
+  );
 }
 
 export function useSettings() {

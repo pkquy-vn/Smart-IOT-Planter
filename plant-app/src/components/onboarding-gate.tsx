@@ -7,11 +7,11 @@ import { useSettings } from '@/lib/settings';
 
 // Full-screen overlay shown until the plant is set up: intro -> setup -> app.
 export function OnboardingGate() {
-  const { profile, introSeen, setIntroSeen } = useSettings();
-  if (profile.setupDone) return null;
+  const { loaded, profile, introSeen, setIntroSeen } = useSettings();
+  if (loaded && profile.setupDone) return null;
   return (
     <View style={styles.overlay}>
-      {introSeen ? <SetupScreen /> : <IntroScreen onStart={() => setIntroSeen(true)} />}
+      {!loaded ? null : introSeen ? <SetupScreen /> : <IntroScreen onStart={() => setIntroSeen(true)} />}
     </View>
   );
 }
