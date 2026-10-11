@@ -82,6 +82,13 @@ bool initCamera() {
         return false;
     }
 
+    // Orientation (see CAMERA_VFLIP / CAMERA_HMIRROR in config.h).
+    sensor_t *sensor = esp_camera_sensor_get();
+    if (sensor) {
+        sensor->set_vflip(sensor, CAMERA_VFLIP);
+        sensor->set_hmirror(sensor, CAMERA_HMIRROR);
+    }
+
     frameMutex = xSemaphoreCreateMutex();
     // Core 1 alongside loop(); Wi-Fi and the web server live on core 0.
     if (xTaskCreatePinnedToCore(cameraTask, "camera", 4096, nullptr, 1, nullptr, 1) != pdPASS) {

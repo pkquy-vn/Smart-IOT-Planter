@@ -69,6 +69,11 @@
 // so HTTP requests never block on the sensor.
 #define CAMERA_FRAME_INTERVAL_MS 150
 
+// Image orientation, applied in the sensor so every client gets it right.
+// Both on = rotated 180 degrees (camera mounted upside down above the pot).
+#define CAMERA_VFLIP 1
+#define CAMERA_HMIRROR 1
+
 // Camera pins (ESP32-S3 CAM). These match many standard ESP32-S3 CAM modules
 // (Freenove / ESP32-S3-WROOM-1). If the camera fails to initialize, verify the
 // pinout for your specific board.
