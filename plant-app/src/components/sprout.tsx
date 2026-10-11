@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, Text, View } from 'react-native';
 
+import { type SproutMood } from '@/lib/mood';
 import { P } from '@/lib/palette';
 
-export type SproutMood = 'happy' | 'ok' | 'sad' | 'wet' | 'thirsty';
+export type { SproutMood } from '@/lib/mood';
 
 const ART = {
   happy: require('@/assets/images/sprout/happy.png'),
@@ -19,7 +20,8 @@ const ART = {
 const BODY_OFFSET = 0.055;
 
 export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mood?: SproutMood; name?: string }) {
-  const bob = useRef(new Animated.Value(0)).current;
+  // Created once; useState keeps it out of render-time ref reads (React Compiler rule).
+  const [bob] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const slump = mood === 'sad' || mood === 'thirsty';
@@ -52,13 +54,3 @@ export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mo
   );
 }
 
-export function sproutMoodFor(moisturePct: number | null, hoursSinceWater: number | null, dryBelow: number, wetAbove: number): SproutMood {
-  if (moisturePct == null) return 'ok';
-  if (moisturePct < dryBelow) return 'thirsty';
-  if (hoursSinceWater != null && hoursSinceWater > 48) return 'sad';
-  if (moisturePct > wetAbove) return 'wet';
-  if (moisturePct < dryBelow + 10) return 'ok';
-  return 'happy';
-}
-
-export const _styles = StyleSheet.create({});

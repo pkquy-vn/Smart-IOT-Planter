@@ -1,22 +1,40 @@
-// One place for everything the hardware team might change.
-export const CONFIG = {
-  // Set to false once the ESP32 is serving real data.
-  USE_MOCK: false,
+import type { Profile } from './profile';
 
-  // IP address of the ESP32 that reads the sensors + runs the pump.
-  // In AP Mode (SmartPlanter_AP), the ESP32 is at 192.168.4.1
-  SENSOR_BOARD_URL: 'http://192.168.4.1',
+// The ESP32 runs its own access point and always answers at this address.
+export const DEFAULT_PLANTER_IP = '192.168.4.1';
 
-  // Camera board snapshot URL. On our single-board setup, it's also at 192.168.4.1.
-  CAMERA_SNAPSHOT_URL: 'http://192.168.4.1/capture',
+// Fixed tuning knobs. Anything the user can change lives in the Profile and is
+// turned into a PlanterConfig by configFor() below.
+export const POLL_MS = 2000;
+export const CAMERA_REFRESH_MS = 1500;
+export const REQUEST_TIMEOUT_MS = 5000;
+export const DEFAULT_DRY_BELOW = 30;
+export const MIN_WET_ABOVE = 70;
 
-  POLL_MS: 2000,
-  CAMERA_REFRESH_MS: 700,
-
-  // Moisture thresholds (percent) for the status colors.
-  DRY_BELOW: 30,
-  WET_ABOVE: 70,
-
-  // Temperature unit shown in the app. The board should send Celsius.
-  FAHRENHEIT: true,
+export type PlanterConfig = {
+  useMock: boolean;
+  boardUrl: string; // http://host, no trailing slash
+  cameraSnapshotUrl: string; // full URL of the JPEG endpoint
+  dryBelow: number; // percent
+  wetAbove: number; // percent
+  fahrenheit: boolean;
 };
+
+export const withHttp = (host: string) => (host.startsWith('http') ? host : `http://${host}`).replace(/\/$/, '');
+
+// Pure: the same profile always gives the same config, so components can derive
+// it with useMemo and re-render when the profile changes.
+export function configFor(p: Profile): PlanterConfig {
+  const sensorHost = p.sensorIp.trim() || DEFAULT_PLANTER_IP;
+  const cameraHost = p.cameraIp.trim() || sensorHost;
+  const dry = parseInt(p.thirstyBelow, 10);
+  const dryBelow = Number.isFinite(dry) ? Math.min(Math.max(dry, 0), 90) : DEFAULT_DRY_BELOW;
+  return {
+    useMock: p.useMock,
+    boardUrl: withHttp(sensorHost),
+    cameraSnapshotUrl: `${withHttp(cameraHost)}/capture`,
+    dryBelow,
+    wetAbove: Math.max(MIN_WET_ABOVE, dryBelow + 20),
+    fahrenheit: p.fahrenheit,
+  };
+}

@@ -1,33 +1,34 @@
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlantBall } from '@/components/plant-ball';
-import { Sprout, sproutMoodFor } from '@/components/sprout';
+import { Sprout } from '@/components/sprout';
 import { getStatus, waterPlant, type Status } from '@/lib/api';
-import { CONFIG } from '@/lib/config';
+import { CAMERA_REFRESH_MS, POLL_MS, type PlanterConfig } from '@/lib/config';
 import { eventsByDay, moodFor } from '@/lib/dates';
+import { moistureLabel, moodMessage, sproutMoodFor, WATERING_JUMP_PCT } from '@/lib/mood';
 import { P } from '@/lib/palette';
 import { useSettings } from '@/lib/settings';
 
-function moistureState(m: number) {
-  if (m < CONFIG.DRY_BELOW) return { label: 'Thirsty', mood: 'sad' as const };
-  if (m > CONFIG.WET_ABOVE) return { label: 'Very wet', mood: 'ok' as const };
-  return { label: 'Happy', mood: 'happy' as const };
-}
+const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MIN_GAP_BETWEEN_AUTO_LOGS_MS = 30 * 60 * 1000;
 
-function CameraView() {
+function CameraView({ config, cameraReady }: { config: PlanterConfig; cameraReady: boolean }) {
   const [tick, setTick] = useState(0);
   const [ok, setOk] = useState(true);
   const [lastFrame, setLastFrame] = useState<Date | null>(null);
-  const pulse = useRef(new Animated.Value(1)).current;
+  // Animated values are created once; useState keeps them out of render-time ref reads.
+  const [pulse] = useState(() => new Animated.Value(1));
+
+  const live = !config.useMock && cameraReady;
 
   useEffect(() => {
-    if (CONFIG.USE_MOCK) return;
-    const id = setInterval(() => setTick((t) => t + 1), CONFIG.CAMERA_REFRESH_MS);
+    if (!live) return;
+    const id = setInterval(() => setTick((t) => t + 1), CAMERA_REFRESH_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [live]);
 
   // Soft blink on the LIVE dot
   useEffect(() => {
@@ -41,35 +42,41 @@ function CameraView() {
     return () => loop.stop();
   }, [pulse]);
 
-  const caption = CONFIG.USE_MOCK
+  const caption = config.useMock
     ? 'Connect the planter to see your plant'
-    : lastFrame
-      ? `Updated ${lastFrame.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
-      : 'Connecting…';
+    : !cameraReady
+      ? 'The planter reports no camera'
+      : lastFrame
+        ? `Updated ${lastFrame.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
+        : 'Connecting…';
+  const showLive = live && ok;
 
   return (
     <View style={styles.cameraCard}>
       <View style={styles.cameraHeader}>
         <Text style={styles.cameraTitle}>Live view</Text>
-        <View style={[styles.liveBadge, !ok && { backgroundColor: P.muteLight }]}>
-          <Animated.View style={[styles.liveDot, { opacity: ok ? pulse : 1 }]} />
-          <Text style={styles.liveText}>{ok ? 'LIVE' : 'NO SIGNAL'}</Text>
+        <View style={[styles.liveBadge, !showLive && { backgroundColor: P.muteLight }]}>
+          <Animated.View style={[styles.liveDot, { opacity: showLive ? pulse : 1 }]} />
+          <Text style={styles.liveText}>{showLive ? 'LIVE' : 'NO SIGNAL'}</Text>
         </View>
       </View>
 
       <View style={styles.cameraFrame}>
-        {CONFIG.USE_MOCK ? (
-          <Text style={styles.cameraText}>Camera preview{'\n'}(demo mode)</Text>
-        ) : (
+        {live ? (
           <Image
-            source={{ uri: `${CONFIG.CAMERA_SNAPSHOT_URL}?t=${tick}` }}
+            source={{ uri: `${config.cameraSnapshotUrl}?t=${tick}` }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             cachePolicy="none"
             transition={0}
-            onLoad={() => { setOk(true); setLastFrame(new Date()); }}
+            onLoad={() => {
+              setOk(true);
+              setLastFrame(new Date());
+            }}
             onError={() => setOk(false)}
           />
+        ) : (
+          <Text style={styles.cameraText}>{config.useMock ? 'Camera preview\n(demo mode)' : 'No camera'}</Text>
         )}
       </View>
 
@@ -78,12 +85,9 @@ function CameraView() {
   );
 }
 
-const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function WeekCard() {
+function WeekCard({ today }: { today: Date }) {
   const { events } = useSettings();
   const byDay = useMemo(() => eventsByDay(events), [events]);
-  const today = new Date();
   const mondayOffset = (today.getDay() + 6) % 7;
 
   return (
@@ -106,90 +110,107 @@ function WeekCard() {
 }
 
 export default function Dashboard() {
-  const { profile, editPlant, events, addEvent, logOncePerDay } = useSettings();
+  const { profile, config, editPlant, events, addEvent, logOncePerDay } = useSettings();
   const [status, setStatus] = useState<Status | null>(null);
+  // "now" advances once per poll, so time-based UI stays pure during render.
+  const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [watering, setWatering] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const failRef = useRef(0);
-  const busyRef = useRef(false);
-
-  const refresh = useCallback(async () => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    try {
-      setStatus(await getStatus());
-      failRef.current = 0;
-      setError(null);
-    } catch {
-      failRef.current += 1;
-      if (failRef.current >= 3) setError("Can't reach the planter. Same Wi-Fi? Check the IP in Edit plant.");
-    } finally {
-      busyRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, CONFIG.POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
-
-  // A thirsty moment gets recorded on the calendar (once per day).
-  useEffect(() => {
-    if (profile.setupDone && status && status.moisture < CONFIG.DRY_BELOW) logOncePerDay('dry');
-  }, [status, profile.setupDone, logOncePerDay]);
+  const prevMoistureRef = useRef<number | null>(null);
+  const lastAutoLogRef = useRef(0);
 
   const lastWatered = useMemo(() => {
     const w = events.filter((e) => e.kind === 'water');
     return w.length ? new Date(Math.max(...w.map((e) => e.t))) : null;
   }, [events]);
 
+  // Poll the board. Restarts whenever the config changes (e.g. a new IP).
+  useEffect(() => {
+    let cancelled = false;
+    let failures = 0;
+    let busy = false;
+    const poll = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const s = await getStatus(config);
+        if (cancelled) return;
+        failures = 0;
+        setStatus(s);
+        setNow(Date.now());
+        setError(null);
+      } catch {
+        if (cancelled) return;
+        failures += 1;
+        if (failures >= 3) setError("Can't reach the planter. Same Wi-Fi? Check the IP in Edit plant.");
+      } finally {
+        busy = false;
+      }
+    };
+    const id = setInterval(poll, POLL_MS);
+    const first = setTimeout(poll, 0);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearTimeout(first);
+    };
+  }, [config]);
+
+  // Journal: a thirsty moment is recorded once per day, and a sudden jump in
+  // moisture is logged as a watering (covers watering by hand).
+  useEffect(() => {
+    if (!status) return;
+    const m = status.moisture;
+    if (m < config.dryBelow) logOncePerDay('dry');
+    const prev = prevMoistureRef.current;
+    prevMoistureRef.current = m;
+    if (config.useMock || prev == null) return;
+    const t = Date.now();
+    if (m - prev >= WATERING_JUMP_PCT && t - lastAutoLogRef.current > MIN_GAP_BETWEEN_AUTO_LOGS_MS) {
+      lastAutoLogRef.current = t;
+      addEvent('water');
+    }
+  }, [status, config.dryBelow, config.useMock, logOncePerDay, addEvent]);
+
   const onWater = async () => {
     setWatering(true);
     setMessage(null);
     try {
-      await waterPlant();
+      await waterPlant(config);
+      lastAutoLogRef.current = Date.now(); // don't double-log when the moisture jumps
       addEvent('water');
       setMessage('Watered!');
-      refresh();
-    } catch (e: any) {
-      setMessage(e?.message ?? 'Could not water :(');
+    } catch (e: unknown) {
+      setMessage(e instanceof Error ? e.message : 'Could not water :(');
     } finally {
       setWatering(false);
     }
   };
 
-  if (!profile.setupDone) return <View style={styles.safe} />;
-
+  const today = useMemo(() => new Date(now), [now]);
   const moisture = status?.moisture ?? 0;
-  const state = moistureState(moisture);
-  const hoursSinceWater = lastWatered ? (Date.now() - lastWatered.getTime()) / 3600000 : null;
-  const sproutMood = sproutMoodFor(status ? moisture : null, hoursSinceWater, CONFIG.DRY_BELOW, CONFIG.WET_ABOVE);
-  const moodMsg =
-    sproutMood === 'sad'
-      ? 'Please water me…'
-      : sproutMood === 'thirsty'
-        ? 'I need a drink!'
-        : sproutMood === 'wet'
-          ? 'Phew, soaked!'
-          : sproutMood === 'happy'
-            ? 'Feeling great!'
-            : 'Just hanging out';
-  const temp = status && status.temperature != null
-    ? CONFIG.FAHRENHEIT
-      ? `${Math.round((status.temperature * 9) / 5 + 32)}°`
-      : `${status.temperature.toFixed(1)}°`
-    : '--';
+  const hoursSinceWater = lastWatered ? (now - lastWatered.getTime()) / 3600000 : null;
+  const sproutMood = sproutMoodFor(status ? moisture : null, hoursSinceWater, config.dryBelow, config.wetAbove);
+  const temp =
+    status && status.temperature != null
+      ? config.fahrenheit
+        ? `${Math.round((status.temperature * 9) / 5 + 32)}°`
+        : `${status.temperature.toFixed(1)}°`
+      : '--';
+  const humidity = status && status.humidity != null ? `${Math.round(status.humidity)}%` : '--';
   const sub = [profile.species, profile.location].filter(Boolean).join(' · ') || 'check on your plant!';
+  const pumpBusy = watering || !!status?.pumpRunning;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.hello}>hello, {profile.name} !</Text>
-            <Text style={styles.sub} numberOfLines={1}>{sub}</Text>
+            <Text style={styles.hello}>hello, {profile.name}!</Text>
+            <Text style={styles.sub} numberOfLines={1}>
+              {sub}
+            </Text>
           </View>
           <Pressable onPress={editPlant} style={styles.editBtn}>
             <Text style={styles.editText}>Edit</Text>
@@ -198,10 +219,10 @@ export default function Dashboard() {
 
         <View style={styles.stage}>
           <Sprout size={200} mood={sproutMood} />
-          <Text style={styles.moodMsg}>{moodMsg}</Text>
+          <Text style={styles.moodMsg}>{moodMessage[sproutMood]}</Text>
         </View>
 
-        <WeekCard />
+        <WeekCard today={today} />
 
         {error && <Text style={styles.error}>{error}</Text>}
 
@@ -212,22 +233,29 @@ export default function Dashboard() {
             <View style={styles.barTrack}>
               <View style={[styles.barFill, { width: `${Math.min(100, moisture)}%` }]} />
             </View>
-            <Text style={styles.tileFoot}>{status ? state.label : 'Connecting…'}</Text>
+            <Text style={styles.tileFoot}>{status ? moistureLabel(moisture, config.dryBelow, config.wetAbove) : 'Connecting…'}</Text>
           </View>
-          <View style={[styles.tile, { backgroundColor: P.white }]}>
-            <Text style={[styles.tileLabel, { color: P.mute }]}>Temperature</Text>
-            <Text style={[styles.tileValue, { color: P.ink }]}>{temp}</Text>
-            <Text style={[styles.tileFoot, { color: P.mute }]}>{CONFIG.FAHRENHEIT ? 'Fahrenheit' : 'Celsius'}</Text>
+          <View style={styles.column}>
+            <View style={[styles.tile, styles.tileSmall, { backgroundColor: P.white }]}>
+              <Text style={[styles.tileLabel, { color: P.mute }]}>Temperature</Text>
+              <Text style={[styles.tileValueSmall, { color: P.ink }]}>{temp}</Text>
+              <Text style={[styles.tileFoot, { color: P.mute }]}>{config.fahrenheit ? 'Fahrenheit' : 'Celsius'}</Text>
+            </View>
+            <View style={[styles.tile, styles.tileSmall, { backgroundColor: P.white }]}>
+              <Text style={[styles.tileLabel, { color: P.mute }]}>Humidity</Text>
+              <Text style={[styles.tileValueSmall, { color: P.ink }]}>{humidity}</Text>
+              <Text style={[styles.tileFoot, { color: P.mute }]}>in the air</Text>
+            </View>
           </View>
         </View>
 
-        <CameraView />
+        <CameraView config={config} cameraReady={config.useMock ? false : (status?.cameraReady ?? true)} />
 
         <Pressable
           onPress={onWater}
-          disabled={watering}
-          style={({ pressed }) => [styles.button, (watering || pressed) && { opacity: 0.7 }]}>
-          <Text style={styles.buttonText}>{watering ? 'Watering…' : 'Water plant'}</Text>
+          disabled={pumpBusy}
+          style={({ pressed }) => [styles.button, (pumpBusy || pressed) && { opacity: 0.7 }]}>
+          <Text style={styles.buttonText}>{pumpBusy ? 'Watering…' : 'Water plant'}</Text>
         </Pressable>
 
         {message && <Text style={styles.message}>{message}</Text>}
@@ -260,9 +288,12 @@ const styles = StyleSheet.create({
   weekLabelToday: { backgroundColor: P.moss, color: P.white },
 
   row: { flexDirection: 'row', gap: 12 },
+  column: { flex: 1, gap: 12 },
   tile: { flex: 1, borderRadius: 26, padding: 16, gap: 6, minHeight: 150 },
+  tileSmall: { minHeight: 0, padding: 14, gap: 2 },
   tileLabel: { color: '#E3EBDC', fontSize: 13, fontWeight: '700' },
   tileValue: { fontSize: 44, fontWeight: '900', color: P.white },
+  tileValueSmall: { fontSize: 26, fontWeight: '900', color: P.white },
   tileFoot: { color: '#E3EBDC', fontWeight: '600', fontSize: 13 },
   barTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4, backgroundColor: P.white },

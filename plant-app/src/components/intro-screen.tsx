@@ -38,7 +38,7 @@ export function IntroScreen({ onStart }: { onStart: () => void }) {
       </View>
 
       <View style={styles.bottom}>
-        <Text style={styles.brand}>splash</Text>
+        <Text style={styles.brand}>Smart Planter</Text>
         <Text style={styles.tag}>your plant, managed from your phone</Text>
         <Pressable onPress={onStart} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}>
           <Text style={styles.btnText}>start !</Text>
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   hillFront: { position: 'absolute', bottom: -90, right: -60, left: -40, height: 180, borderRadius: 140, backgroundColor: '#BCD4AF' },
   family: { position: 'absolute', bottom: 40, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end' },
   bottom: { alignItems: 'center', paddingHorizontal: 28, paddingBottom: 24, gap: 10 },
-  brand: { fontSize: 40, fontWeight: '900', letterSpacing: 4, color: P.forest },
+  brand: { fontSize: 40, fontWeight: '900', letterSpacing: 1, color: P.forest },
   tag: { fontSize: 16, color: P.mute, fontWeight: '600' },
   btn: { marginTop: 8, backgroundColor: P.moss, borderRadius: 40, paddingVertical: 18, paddingHorizontal: 54 },
   btnText: { color: P.white, fontSize: 18, fontWeight: '800' },

@@ -4,10 +4,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Face } from '@/components/face';
+import { probeBoard } from '@/lib/api';
+import { DEFAULT_PLANTER_IP, withHttp } from '@/lib/config';
 import { P } from '@/lib/palette';
-import { useSettings, withHttp } from '@/lib/settings';
-
+import { useSettings } from '@/lib/settings';
 
 export function SetupScreen() {
   const { profile, save } = useSettings();
@@ -23,20 +23,15 @@ export function SetupScreen() {
     if (!form.sensorIp.trim()) return setTestMsg({ ok: false, text: 'Enter the planter IP first.' });
     setTesting(true);
     setTestMsg(null);
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
     try {
-      const res = await fetch(`${withHttp(form.sensorIp.trim())}/status`, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
-      setTestMsg({ ok: true, text: `Connected! Moisture ${Math.round(data.moisture)}%` });
+      const data = await probeBoard(withHttp(form.sensorIp.trim()));
+      setTestMsg({ ok: true, text: `Connected! Moisture ${Math.round(data.moisture)}%${data.cameraReady ? '' : ' (no camera)'}` });
     } catch {
       setTestMsg({
         ok: false,
         text: "Couldn't connect. Same Wi-Fi as the planter? Is the IP right?",
       });
     } finally {
-      clearTimeout(timer);
       setTesting(false);
     }
   };
@@ -70,7 +65,7 @@ export function SetupScreen() {
             value={form.thirstyBelow}
             onChangeText={(v) => set('thirstyBelow', v.replace(/[^0-9]/g, ''))}
           />
-          <Text style={styles.hint}>Check your plant's care info. Most houseplants like 30–60%.</Text>
+          <Text style={styles.hint}>Check your plant&apos;s care info. Most houseplants like 30–60%.</Text>
 
           <Text style={styles.label}>Location (optional)</Text>
           <TextInput
@@ -99,7 +94,7 @@ export function SetupScreen() {
               value={form.useMock}
               onValueChange={(v) => {
                 set('useMock', v);
-                if (!v && !form.sensorIp.trim()) set('sensorIp', '192.168.4.1');
+                if (!v && !form.sensorIp.trim()) set('sensorIp', DEFAULT_PLANTER_IP);
               }}
               trackColor={{ true: P.moss }}
             />
@@ -110,7 +105,7 @@ export function SetupScreen() {
               <Text style={styles.label}>Planter IP (sensors + pump)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="192.168.4.1"
+                placeholder={DEFAULT_PLANTER_IP}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="numbers-and-punctuation"
@@ -130,6 +125,14 @@ export function SetupScreen() {
               <Text style={styles.hint}>Your hardware teammates can read these from the Serial Monitor.</Text>
             </>
           )}
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Show temperature in °F</Text>
+              <Text style={styles.hint}>Off = Celsius, the unit the planter sends.</Text>
+            </View>
+            <Switch value={form.fahrenheit} onValueChange={(v) => set('fahrenheit', v)} trackColor={{ true: P.moss }} />
+          </View>
 
           <Pressable onPress={testConnection} disabled={testing} style={styles.secondary}>
             <Text style={styles.secondaryText}>{testing ? 'Testing…' : 'Test connection'}</Text>
@@ -153,7 +156,6 @@ export function SetupScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: P.paper },
   content: { padding: 20, gap: 8, paddingBottom: 60 },
-  emoji: { fontSize: 48, textAlign: 'center', marginTop: 8 },
   title: { fontSize: 30, fontWeight: '900', color: P.ink, textAlign: 'center' },
   sub: { color: P.mute, textAlign: 'center', marginBottom: 12 },
   label: { fontWeight: '700', color: P.ink, marginTop: 10 },

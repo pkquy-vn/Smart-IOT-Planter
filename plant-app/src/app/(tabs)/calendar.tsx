@@ -38,7 +38,7 @@ export default function CalendarScreen() {
 
   const lastWater = events.filter((e) => e.kind === 'water').map((e) => e.t);
   const sinceDays = lastWater.length
-    ? Math.floor((Date.now() - Math.max(...lastWater)) / 86400000)
+    ? Math.floor((today.getTime() - Math.max(...lastWater)) / 86400000)
     : null;
 
   const selEvents = (byDay[dayKey(selected)] ?? []).sort((a, b) => a.t - b.t);
