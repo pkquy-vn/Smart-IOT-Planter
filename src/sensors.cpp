@@ -1,9 +1,5 @@
 #include "sensors.h"
 #include "config.h"
-#include <DHT.h>  // only for the DHT11 / DHT22 constants that DHT_TYPE uses
-
-// DHT11 needs at least 2 s between reads.
-static const unsigned long SENSOR_INTERVAL_MS = 2500;
 
 // Cached readings. Written from loop(), read from the web server task.
 static volatile int lastRaw = 0;
