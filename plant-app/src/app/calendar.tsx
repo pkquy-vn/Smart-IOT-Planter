@@ -2,17 +2,20 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MilestonesCard } from '@/components/milestones-card';
 import { PlantBall } from '@/components/plant-ball';
 import { Text } from '@/components/text';
 import { useNow } from '@/hooks/use-now';
 import { dayKey, eventsByDay, moodFor, summarizeDay } from '@/lib/dates';
+import { milestones } from '@/lib/milestones';
 import { P } from '@/lib/palette';
 import { useSettings } from '@/lib/settings';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function CalendarScreen() {
-  const { events, addEvent, profile } = useSettings();
+  // Waterings are logged automatically by the Water button (see lib/status.tsx).
+  const { events, profile } = useSettings();
   const now = useNow();
   const [gridWidth, setGridWidth] = useState(0);
   const today = new Date();
@@ -145,10 +148,7 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        <Pressable onPress={() => addEvent('water')} style={({ pressed }) => [styles.logBtn, pressed && { opacity: 0.8 }]}>
-          <Text style={styles.logText}>+  Log a watering today</Text>
-        </Pressable>
-
+        <MilestonesCard m={milestones(events, profile.since ?? now, now)} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,6 +182,4 @@ const styles = StyleSheet.create({
   detail: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: P.white, borderRadius: 26, padding: 16 },
   detailTitle: { fontWeight: '900', fontSize: 16, color: P.ink },
   detailText: { color: P.mute, fontSize: 14 },
-  logBtn: { backgroundColor: P.moss, borderRadius: 40, paddingVertical: 18, alignItems: 'center' },
-  logText: { color: P.white, fontSize: 16, fontWeight: '800' },
 });

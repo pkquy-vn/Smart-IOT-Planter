@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MoistureRing } from '@/components/moisture-ring';
+import { OfflineCard } from '@/components/offline-card';
 import { Skeleton } from '@/components/skeleton';
 import { SplashBurst } from '@/components/splash-burst';
 import { Sprout, sproutMoodFor } from '@/components/sprout';
@@ -14,6 +15,7 @@ import { CONFIG } from '@/lib/config';
 import { P } from '@/lib/palette';
 import { PLANT_TYPES } from '@/lib/plants';
 import { useSettings } from '@/lib/settings';
+import { milestones } from '@/lib/milestones';
 import { useStatus } from '@/lib/status';
 import { useTourScroller, useTourTarget } from '@/lib/tour';
 
@@ -36,7 +38,7 @@ const MOOD_MSG = {
 // Home: how the plant is doing right now, this week at a glance, and the Water button.
 export default function Home() {
   const { profile, events } = useSettings();
-  const { status, error, water, splash } = useStatus();
+  const { status, error, retry, water, splash } = useStatus();
   const now = useNow();
   const scrollRef = useRef<ScrollView>(null);
   useTourScroller(useCallback((y: number) => scrollRef.current?.scrollTo({ y, animated: true }), []));
@@ -70,6 +72,7 @@ export default function Home() {
   const humidity = status?.humidity != null ? `${Math.round(status.humidity)}%` : null;
   const sub = profile.species || PLANT_TYPES[profile.plantType].label;
   const loading = !status && !error;
+  const streak = milestones(events, profile.since ?? now, now).happyStreak;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -82,14 +85,15 @@ export default function Home() {
         <View {...tourSprout} style={styles.stage}>
           <Sprout size={200} mood={mood} />
           <SplashBurst trigger={splash} />
-          <Text style={styles.moodMsg}>{status?.pumpRunning ? 'Glug glug glug…' : MOOD_MSG[mood]}</Text>
+          {streak >= 2 && !error && <Text style={styles.streak}>{streak} happy days in a row</Text>}
+          <Text style={styles.moodMsg}>{error ? 'Zzz… I can’t find the planter' : status?.pumpRunning ? 'Glug glug glug…' : MOOD_MSG[mood]}</Text>
         </View>
 
         <View {...tourWeek}>
           <WeekCard />
         </View>
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <OfflineCard onRetry={retry} hasOldReadings={!!status} />}
 
         <View style={styles.row}>
           <View style={[styles.tile, styles.moistTile]}>
@@ -113,13 +117,13 @@ export default function Home() {
             <View style={[styles.tile, styles.smallTile]}>
               <Text style={styles.smallLabel}>Air humidity</Text>
               {loading ? <Skeleton width={70} height={30} color={P.mist} /> : <Text style={styles.smallValue}>{humidity ?? '--'}</Text>}
-              <Text style={styles.smallFoot}>Around the plant</Text>
+              <Text style={styles.smallFoot}>{status && status.humidity == null ? 'No sensor on planter' : 'Around the plant'}</Text>
             </View>
           </View>
         </View>
 
         <View {...tourWater}>
-          <WaterButton onWater={water} pumpRunning={!!status?.pumpRunning} />
+          <WaterButton onWater={water} pumpRunning={!!status?.pumpRunning} soaked={moisture != null && moisture > CONFIG.WET_ABOVE} />
         </View>
 
         <Text style={styles.footer}>
@@ -138,6 +142,10 @@ const styles = StyleSheet.create({
   sub: { color: P.mute, fontSize: 13 },
 
   stage: { alignItems: 'center', justifyContent: 'center', backgroundColor: P.white, borderRadius: 26, paddingTop: 26, paddingBottom: 18, overflow: 'hidden' },
+  streak: {
+    marginTop: 4, backgroundColor: P.mist, color: P.fern, fontSize: 12, paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 10, overflow: 'hidden',
+  },
   moodMsg: { marginTop: 8, fontWeight: '800', color: P.ink, fontSize: 16 },
 
   row: { flexDirection: 'row', gap: 12 },
@@ -151,6 +159,5 @@ const styles = StyleSheet.create({
   smallValue: { fontSize: 30, fontWeight: '900', color: P.ink },
   smallFoot: { color: P.mute, fontWeight: '600', fontSize: 12 },
 
-  error: { color: P.alert, backgroundColor: P.white, textAlign: 'center', fontWeight: '600', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16 },
   footer: { textAlign: 'center', color: P.mute, fontSize: 13 },
 });

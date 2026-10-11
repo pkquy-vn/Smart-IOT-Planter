@@ -26,8 +26,18 @@ function startCountdown(ms: number, tick: (seconds: number) => void, done: () =>
 
 // Big "Water plant" button that shows the pump running, then a cooldown countdown.
 // `pumpRunning` comes from the planter, so it also lights up when the pump was started elsewhere.
-export function WaterButton({ onWater, pumpRunning = false }: { onWater: () => Promise<void>; pumpRunning?: boolean }) {
+// `soaked` asks for a second tap first, since a pump run can't be undone.
+export function WaterButton({
+  onWater,
+  pumpRunning = false,
+  soaked = false,
+}: {
+  onWater: () => Promise<void>;
+  pumpRunning?: boolean;
+  soaked?: boolean;
+}) {
   const [phase, setPhase] = useState<Phase>('idle');
+  const [confirming, setConfirming] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [progress] = useState(() => new Animated.Value(0));
@@ -41,8 +51,19 @@ export function WaterButton({ onWater, pumpRunning = false }: { onWater: () => P
     cancel.current = startCountdown(ms, setSecondsLeft, next);
   };
 
-  const press = async () => {
+  const press = () => {
     if (phase !== 'idle' || pumpRunning) return;
+    if (soaked) {
+      tap();
+      setNote(null);
+      setConfirming(true);
+      return;
+    }
+    start();
+  };
+
+  const start = async () => {
+    setConfirming(false);
     tap();
     setNote(null);
     setPhase('sending');
@@ -88,6 +109,23 @@ export function WaterButton({ onWater, pumpRunning = false }: { onWater: () => P
   const disabled = phase !== 'idle' || pumpRunning;
   const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
+  if (confirming) {
+    return (
+      <View style={styles.confirm}>
+        <Text style={styles.confirmTitle}>Your plant is already soaked</Text>
+        <Text style={styles.confirmText}>Too much water can rot the roots. Water anyway?</Text>
+        <View style={styles.confirmRow}>
+          <Pressable onPress={() => setConfirming(false)} style={[styles.choice, styles.choiceGhost]}>
+            <Text style={[styles.choiceText, { color: P.moss }]}>no, skip it</Text>
+          </Pressable>
+          <Pressable onPress={start} style={[styles.choice, styles.choiceSolid]}>
+            <Text style={styles.choiceText}>water anyway</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -120,4 +158,12 @@ const styles = StyleSheet.create({
   text: { color: P.white, fontSize: 18, fontWeight: '800' },
   textCooling: { color: P.forest },
   note: { textAlign: 'center', fontWeight: '700' },
+  confirm: { backgroundColor: P.white, borderRadius: 26, padding: 16, gap: 6, borderWidth: 2, borderColor: P.sage },
+  confirmTitle: { color: P.ink, fontSize: 17, textAlign: 'center' },
+  confirmText: { color: P.mute, fontSize: 14, textAlign: 'center' },
+  confirmRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  choice: { flex: 1, borderRadius: 30, paddingVertical: 14, alignItems: 'center' },
+  choiceGhost: { borderWidth: 2, borderColor: P.moss },
+  choiceSolid: { backgroundColor: P.moss },
+  choiceText: { color: P.white, fontSize: 16 },
 });

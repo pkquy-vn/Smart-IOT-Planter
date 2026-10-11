@@ -15,6 +15,7 @@ export type Profile = {
   sensorIp: string; // e.g. 192.168.1.50
   cameraIp: string; // e.g. 192.168.1.51
   alerts: boolean; // notify when the plant gets thirsty
+  since: number | null; // when the plant was first set up (for "days together")
   units: Units; // imperial = °F, fl oz, inches; metric = °C, ml, centimeters
 };
 
@@ -28,6 +29,7 @@ const DEFAULT: Profile = {
   sensorIp: '',
   cameraIp: '',
   alerts: true,
+  since: null,
   units: 'imperial',
 };
 
@@ -108,6 +110,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           if (saved.introSeen) setIntroSeen(true);
           if (saved.tourSeen) setTourSeen(true);
           if (Array.isArray(saved.events)) setEvents(saved.events);
+          // Older saves have no setup date: use the earliest journal entry instead.
+          if (saved.profile?.setupDone && !saved.profile.since) {
+            const first = (saved.events ?? []).reduce((min, e) => Math.min(min, e.t), Date.now());
+            setProfile((p) => ({ ...p, since: first }));
+          }
         }
         if (rawReadings) {
           const rs = JSON.parse(rawReadings);
@@ -132,10 +139,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const save = (p: Profile) => {
     applyToConfig(p);
-    setProfile({ ...p, setupDone: true });
+    // Demo mode comes with 45 days of fake history, so it starts "together" from the first fake entry.
+    const history = p.useMock && !events.length ? seedHistory() : events;
+    const since = p.since ?? history.reduce((min, e) => Math.min(min, e.t), Date.now());
+    setProfile({ ...p, since, setupDone: true });
     // Demo mode: fill the calendar and the chart with some fake history.
     if (p.useMock) {
-      const history = events.length ? events : seedHistory();
       if (!events.length) setEvents(history);
       setReadings((prev) => (prev.length ? prev : seedReadings(history, CONFIG.HISTORY_SAMPLE_MS, CONFIG.HISTORY_DAYS)));
     }

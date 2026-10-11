@@ -11,6 +11,7 @@ const ALERT_EVERY_MS = 6 * 3600000;
 type Ctx = {
   status: Status | null; // latest reading, null until the first one arrives
   error: string | null;
+  retry: () => Promise<void>; // check the planter again right now
   water: () => Promise<void>; // throws with a readable message if the planter refuses
   splash: number; // goes up on every watering, to play the droplet animation
 };
@@ -45,7 +46,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch {
       failRef.current += 1;
-      if (failRef.current >= 3) setError("Can't reach the planter. Same Wi-Fi? Check the IP in Settings.");
+      if (failRef.current >= 3) setError("Can't reach the planter");
     } finally {
       busyRef.current = false;
     }
@@ -83,7 +84,12 @@ export function StatusProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [addEvent, refresh]);
 
-  return <StatusContext.Provider value={{ status, error, water, splash }}>{children}</StatusContext.Provider>;
+  const retry = useCallback(async () => {
+    failRef.current = 2; // one more miss shows the offline card again straight away
+    await refresh();
+  }, [refresh]);
+
+  return <StatusContext.Provider value={{ status, error, retry, water, splash }}>{children}</StatusContext.Provider>;
 }
 
 export function useStatus() {
