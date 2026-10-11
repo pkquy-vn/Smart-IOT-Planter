@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PlantBall } from '@/components/plant-ball';
+import { Text } from '@/components/text';
 import { P } from '@/lib/palette';
 
-// A calm little garden: green buddies sitting on a hill with leaves drifting down.
+// A calm little garden: the cactus buddy sitting on a hill with leaves drifting down.
 const LEAVES = [
   { w: 22, top: 40, left: 40, deg: -30 },
   { w: 14, top: 92, left: 96, deg: 40 },
@@ -26,19 +27,11 @@ export function IntroScreen({ onStart }: { onStart: () => void }) {
 
         <View style={styles.hillBack} />
         <View style={styles.hillFront} />
-        <View style={styles.family}>
-          <View style={{ marginRight: -10 }}>
-            <PlantBall size={84} mood="ok" accessory="twin" />
-          </View>
-          <PlantBall size={160} mood="happy" accessory="leaf" />
-          <View style={{ marginLeft: -8 }}>
-            <PlantBall size={70} mood="happy" accessory="bud" />
-          </View>
-        </View>
+        <Image source={require('@/assets/images/plants/succulent.png')} style={styles.hero} contentFit="contain" />
       </View>
 
       <View style={styles.bottom}>
-        <Text style={styles.brand}>splash</Text>
+        <Text style={styles.brand}>water me</Text>
         <Text style={styles.tag}>your plant, managed from your phone</Text>
         <Pressable onPress={onStart} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}>
           <Text style={styles.btnText}>start !</Text>
@@ -55,7 +48,7 @@ const styles = StyleSheet.create({
   leaf: { position: 'absolute', backgroundColor: '#9DC390', opacity: 0.7, borderTopLeftRadius: 30, borderBottomRightRadius: 30 },
   hillBack: { position: 'absolute', bottom: -70, left: -80, width: 320, height: 200, borderRadius: 160, backgroundColor: '#CFE0C4' },
   hillFront: { position: 'absolute', bottom: -90, right: -60, left: -40, height: 180, borderRadius: 140, backgroundColor: '#BCD4AF' },
-  family: { position: 'absolute', bottom: 40, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end' },
+  hero: { position: 'absolute', bottom: 24, alignSelf: 'center', width: 230, height: 230 },
   bottom: { alignItems: 'center', paddingHorizontal: 28, paddingBottom: 24, gap: 10 },
   brand: { fontSize: 40, fontWeight: '900', letterSpacing: 4, color: P.forest },
   tag: { fontSize: 16, color: P.mute, fontWeight: '600' },

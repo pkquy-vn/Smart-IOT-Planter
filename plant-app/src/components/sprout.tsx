@@ -1,12 +1,15 @@
 import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { P } from '@/lib/palette';
 
-export type SproutMood = 'happy' | 'ok' | 'sad' | 'wet' | 'thirsty';
+// joy = freshly soaked (happy face, bouncing); wet = too much water.
+export type SproutMood = 'joy' | 'happy' | 'ok' | 'sad' | 'wet' | 'thirsty';
 
 const ART = {
+  joy: require('@/assets/images/sprout/happy.png'),
   happy: require('@/assets/images/sprout/happy.png'),
   ok: require('@/assets/images/sprout/ok.png'),
   sad: require('@/assets/images/sprout/sad.png'),
@@ -19,14 +22,16 @@ const ART = {
 const BODY_OFFSET = 0.055;
 
 export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mood?: SproutMood; name?: string }) {
-  const bob = useRef(new Animated.Value(0)).current;
+  const [bob] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const slump = mood === 'sad' || mood === 'thirsty';
+    // Joy hops quickly; sad and thirsty sway slowly; everything else bobs gently.
+    const ms = mood === 'joy' ? 380 : slump ? 2200 : 1400;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bob, { toValue: 1, duration: slump ? 2200 : 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(bob, { toValue: 0, duration: slump ? 2200 : 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 1, duration: ms, easing: mood === 'joy' ? Easing.out(Easing.quad) : Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 0, duration: ms, easing: mood === 'joy' ? Easing.in(Easing.quad) : Easing.inOut(Easing.sin), useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -34,12 +39,14 @@ export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mo
   }, [bob, mood]);
 
   const slump = mood === 'sad' || mood === 'thirsty';
-  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, slump ? 2 : -6] });
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, slump ? 2 : mood === 'joy' ? -14 : -6] });
+  // A little side-to-side wiggle while hopping for joy.
+  const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: ['0deg', mood === 'joy' ? '4deg' : '0deg'] });
 
   return (
     <View style={{ width: size, height: size * 1.1, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ position: 'absolute', bottom: 4, width: size * 0.5, height: size * 0.05, borderRadius: size, backgroundColor: 'rgba(30,91,52,0.15)' }} />
-      <Animated.View style={{ transform: [{ translateX: -size * BODY_OFFSET }, { translateY }] }}>
+      <Animated.View style={{ transform: [{ translateX: -size * BODY_OFFSET }, { translateY }, { rotate }] }}>
         <Image source={ART[mood]} style={{ width: size, height: size }} contentFit="contain" />
       </Animated.View>
 
@@ -52,11 +59,22 @@ export function Sprout({ size = 220, mood = 'happy', name }: { size?: number; mo
   );
 }
 
-export function sproutMoodFor(moisturePct: number | null, hoursSinceWater: number | null, dryBelow: number, wetAbove: number): SproutMood {
+// `sadAfterHours` comes from the plant type (e.g. 3 days for herbs, 14 for cacti),
+// so a cactus isn't sad just because it hasn't been watered for two days.
+// Nicely soaked (above wetAbove) is pure joy; only past tooWet is it too much.
+export function sproutMoodFor(
+  moisturePct: number | null,
+  hoursSinceWater: number | null,
+  dryBelow: number,
+  wetAbove: number,
+  sadAfterHours = 48,
+  tooWet = 100,
+): SproutMood {
   if (moisturePct == null) return 'ok';
   if (moisturePct < dryBelow) return 'thirsty';
-  if (hoursSinceWater != null && hoursSinceWater > 48) return 'sad';
-  if (moisturePct > wetAbove) return 'wet';
+  if (hoursSinceWater != null && hoursSinceWater > sadAfterHours && moisturePct < dryBelow + 10) return 'sad';
+  if (moisturePct > tooWet) return 'wet';
+  if (moisturePct > wetAbove) return 'joy';
   if (moisturePct < dryBelow + 10) return 'ok';
   return 'happy';
 }

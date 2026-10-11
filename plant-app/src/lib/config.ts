@@ -13,9 +13,22 @@ export const CONFIG = {
   POLL_MS: 2000,
   CAMERA_REFRESH_MS: 700,
 
+  // Must match PUMP_ON_DURATION_MS / PUMP_COOLDOWN_MS in the firmware's config.h
+  PUMP_ON_MS: 5000,
+  PUMP_COOLDOWN_MS: 10000,
+
+  // Roughly how much water one 5-second pump run moves. Fixed by the hardware;
+  // measure it once with a measuring cup and update this so the care guide is accurate.
+  ML_PER_PRESS: 120,
+
+  // Moisture history for the chart: one reading every 10 min, kept for 7 days
+  HISTORY_SAMPLE_MS: 10 * 60 * 1000,
+  HISTORY_DAYS: 7,
+
   // Moisture thresholds (percent) for the status colors.
   DRY_BELOW: 30,
-  WET_ABOVE: 70,
+  WET_ABOVE: 70, // above this the soil is nicely soaked (the plant is thrilled)
+  TOO_WET: 85, // above this it's too much water
 
   // Temperature unit shown in the app. The board should send Celsius.
   FAHRENHEIT: true,

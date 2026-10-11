@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlantBall } from '@/components/plant-ball';
-import { dayKey, eventsByDay, moodFor } from '@/lib/dates';
+import { Text } from '@/components/text';
+import { useNow } from '@/hooks/use-now';
+import { dayKey, eventsByDay, moodFor, summarizeDay } from '@/lib/dates';
 import { P } from '@/lib/palette';
 import { useSettings } from '@/lib/settings';
 
@@ -11,13 +13,15 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function CalendarScreen() {
   const { events, addEvent, profile } = useSettings();
-  const { width } = useWindowDimensions();
+  const now = useNow();
+  const [gridWidth, setGridWidth] = useState(0);
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<Date>(today);
 
   const byDay = useMemo(() => eventsByDay(events), [events]);
-  const cell = Math.min(width - 32, 560) / 7;
+  // Ball size comes from the measured grid width, so the 7 columns always fit (phones round pixels differently).
+  const ball = Math.min(gridWidth / 7 - 12, 44);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -27,6 +31,12 @@ export default function CalendarScreen() {
     ...Array.from({ length: lead }, () => null),
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
   ];
+  // One row per week, padded to 7 so every row has a cell under each weekday.
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const row = cells.slice(i, i + 7);
+    weeks.push([...row, ...Array.from({ length: 7 - row.length }, () => null)]);
+  }
 
   const inMonth = events.filter((e) => {
     const d = new Date(e.t);
@@ -38,10 +48,10 @@ export default function CalendarScreen() {
 
   const lastWater = events.filter((e) => e.kind === 'water').map((e) => e.t);
   const sinceDays = lastWater.length
-    ? Math.floor((Date.now() - Math.max(...lastWater)) / 86400000)
+    ? Math.floor((now - Math.max(...lastWater)) / 86400000)
     : null;
 
-  const selEvents = (byDay[dayKey(selected)] ?? []).sort((a, b) => a.t - b.t);
+  const selSummary = summarizeDay(byDay[dayKey(selected)] ?? []);
   const selLabel = selected.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
   const sameDay = (a: Date, b: Date) => dayKey(a) === dayKey(b);
 
@@ -66,28 +76,31 @@ export default function CalendarScreen() {
           </Pressable>
         </View>
 
-        <View style={{ alignSelf: 'center' }}>
-          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+        <View style={styles.grid} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
+          <View style={styles.week}>
             {DOW.map((d) => (
-              <Text key={d} style={[styles.dow, { width: cell }]}>{d}</Text>
+              <Text key={d} style={[styles.dow, styles.col]}>{d}</Text>
             ))}
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: cell * 7 }}>
-            {cells.map((d, i) =>
-              d ? (
-                <Pressable key={i} onPress={() => setSelected(d)} style={{ width: cell, alignItems: 'center', paddingVertical: 6 }}>
-                  <View style={[styles.ballWrap, sameDay(d, selected) && styles.ballSel]}>
-                    <PlantBall size={cell * 0.74} mood={moodFor(d, byDay, today)} />
-                  </View>
-                  <View style={[styles.num, sameDay(d, today) && styles.numToday]}>
-                    <Text style={[styles.numText, sameDay(d, today) && { color: P.white }]}>{d.getDate()}</Text>
-                  </View>
-                </Pressable>
-              ) : (
-                <View key={i} style={{ width: cell }} />
-              ),
-            )}
-          </View>
+          {gridWidth > 0 &&
+            weeks.map((week, w) => (
+              <View key={w} style={styles.week}>
+                {week.map((d, i) =>
+                  d ? (
+                    <Pressable key={i} onPress={() => setSelected(d)} style={[styles.col, styles.day]}>
+                      <View style={[styles.ballWrap, sameDay(d, selected) && styles.ballSel]}>
+                        <PlantBall size={ball} mood={moodFor(d, byDay, today)} />
+                      </View>
+                      <View style={[styles.num, sameDay(d, today) && styles.numToday]}>
+                        <Text style={[styles.numText, sameDay(d, today) && { color: P.white }]}>{d.getDate()}</Text>
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <View key={i} style={styles.col} />
+                  ),
+                )}
+              </View>
+            ))}
         </View>
 
         <View style={styles.legend}>
@@ -118,13 +131,14 @@ export default function CalendarScreen() {
           <PlantBall size={56} mood={selMood} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.detailTitle}>{selLabel}</Text>
-            {selEvents.length === 0 ? (
+            {selSummary.length === 0 ? (
               <Text style={styles.detailText}>Nothing logged.</Text>
             ) : (
-              selEvents.map((e, i) => (
-                <Text key={i} style={styles.detailText}>
-                  {e.kind === 'water' ? '💧 Watered' : '🥀 Soil got dry'} ·{' '}
-                  {new Date(e.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              selSummary.map(({ kind, count, last }) => (
+                <Text key={kind} style={styles.detailText}>
+                  {kind === 'water' ? 'Watered' : 'Soil got dry'}
+                  {count > 1 ? ` ${count}× · last at ` : ' · '}
+                  {new Date(last).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </Text>
               ))
             )}
@@ -134,6 +148,7 @@ export default function CalendarScreen() {
         <Pressable onPress={() => addEvent('water')} style={({ pressed }) => [styles.logBtn, pressed && { opacity: 0.8 }]}>
           <Text style={styles.logText}>+  Log a watering today</Text>
         </Pressable>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -147,7 +162,11 @@ const styles = StyleSheet.create({
   month: { fontSize: 26, fontWeight: '800', color: P.forest, minWidth: 140, textAlign: 'center' },
   arrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   arrowText: { fontSize: 26, fontWeight: '700', color: P.muteLight, marginTop: -3 },
-  dow: { textAlign: 'center', color: P.muteLight, fontWeight: '600', fontSize: 13 },
+  grid: { width: '100%', maxWidth: 560, alignSelf: 'center' },
+  week: { flexDirection: 'row' },
+  col: { flex: 1, minWidth: 0 },
+  day: { alignItems: 'center', paddingVertical: 6 },
+  dow: { marginBottom: 6, textAlign: 'center', color: P.muteLight, fontWeight: '600', fontSize: 13 },
   ballWrap: { borderRadius: 999, padding: 2, borderWidth: 2, borderColor: 'transparent' },
   ballSel: { borderColor: P.moss },
   num: { marginTop: 4, minWidth: 26, height: 20, paddingHorizontal: 7, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -157,10 +176,10 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendText: { color: P.mute, fontSize: 12, fontWeight: '600' },
   statsRow: { flexDirection: 'row', gap: 10 },
-  stat: { flex: 1, borderRadius: 22, padding: 14, gap: 2, backgroundColor: P.white },
+  stat: { flex: 1, borderRadius: 26, padding: 14, gap: 2, backgroundColor: P.white },
   statNum: { fontSize: 30, fontWeight: '900', color: P.ink },
   statLabel: { fontSize: 11, fontWeight: '700', color: P.mute },
-  detail: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: P.white, borderRadius: 22, padding: 16 },
+  detail: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: P.white, borderRadius: 26, padding: 16 },
   detailTitle: { fontWeight: '900', fontSize: 16, color: P.ink },
   detailText: { color: P.mute, fontSize: 14 },
   logBtn: { backgroundColor: P.moss, borderRadius: 40, paddingVertical: 18, alignItems: 'center' },
