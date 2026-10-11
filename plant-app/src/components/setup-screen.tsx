@@ -95,7 +95,14 @@ export function SetupScreen() {
               <Text style={styles.switchTitle}>Demo mode</Text>
               <Text style={styles.hint}>Use fake data until the hardware is ready.</Text>
             </View>
-            <Switch value={form.useMock} onValueChange={(v) => set('useMock', v)} trackColor={{ true: P.moss }} />
+            <Switch
+              value={form.useMock}
+              onValueChange={(v) => {
+                set('useMock', v);
+                if (!v && !form.sensorIp.trim()) set('sensorIp', '192.168.4.1');
+              }}
+              trackColor={{ true: P.moss }}
+            />
           </View>
 
           {!form.useMock && (
