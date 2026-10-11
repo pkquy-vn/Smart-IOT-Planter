@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Smart Planter",
+    "name": "water me",
     "slug": "smart-planter",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,7 +38,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

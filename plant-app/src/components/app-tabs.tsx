@@ -1,9 +1,11 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
 export default function AppTabs() {
-  const colors = Colors.light; // the app is light-only for now (see userInterfaceStyle in app.json)
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
   return (
     <NativeTabs
@@ -12,12 +14,22 @@ export default function AppTabs() {
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/home.png')} renderingMode="template" />
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="care">
+        <NativeTabs.Trigger.Label>Care</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'leaf', selected: 'leaf.fill' }} md="eco" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="calendar">
         <NativeTabs.Trigger.Label>Journal</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/explore.png')} renderingMode="template" />
+        <NativeTabs.Trigger.Icon sf={{ default: 'calendar', selected: 'calendar' }} md="calendar_month" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

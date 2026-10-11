@@ -16,9 +16,20 @@ describe('configFor', () => {
   });
 
   test('thresholds are clamped and keep a gap between dry and wet', () => {
-    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: '95' })).toMatchObject({ dryBelow: 90, wetAbove: 110 });
-    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: 'abc' })).toMatchObject({ dryBelow: 30, wetAbove: 70 });
-    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: '60' })).toMatchObject({ dryBelow: 60, wetAbove: 80 });
+    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: '95' })).toMatchObject({ dryBelow: 90, wetAbove: 105, tooWet: 120 });
+    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: '60' })).toMatchObject({ dryBelow: 60, wetAbove: 75 });
+  });
+
+  test('the thirsty level comes from the plant type unless the user set one', () => {
+    expect(configFor({ ...DEFAULT_PROFILE, thirstyBelow: 'abc' })).toMatchObject({ dryBelow: 30, wetAbove: 70, tooWet: 85 });
+    expect(configFor({ ...DEFAULT_PROFILE, plantType: 'succulent' })).toMatchObject({ dryBelow: 15, wetAbove: 50 });
+    expect(configFor({ ...DEFAULT_PROFILE, plantType: 'fern' })).toMatchObject({ dryBelow: 45, wetAbove: 85 });
+    expect(configFor({ ...DEFAULT_PROFILE, plantType: 'fern', thirstyBelow: '20' })).toMatchObject({ dryBelow: 20 });
+  });
+
+  test('units drive the temperature scale', () => {
+    expect(configFor({ ...DEFAULT_PROFILE, units: 'imperial' }).fahrenheit).toBe(true);
+    expect(configFor({ ...DEFAULT_PROFILE, units: 'metric' }).fahrenheit).toBe(false);
   });
 
   test('withHttp', () => {

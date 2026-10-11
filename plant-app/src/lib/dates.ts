@@ -30,3 +30,31 @@ export function seedHistory(): PlantEvent[] {
   }
   return out;
 }
+
+// One moisture sample for the history chart.
+export type Reading = { t: number; m: number };
+
+// Fake week of moisture readings for demo mode: slow drying, jumping back up on watering days.
+export function seedReadings(events: PlantEvent[], everyMs: number, days: number): Reading[] {
+  const out: Reading[] = [];
+  const waters = events.filter((e) => e.kind === 'water').map((e) => e.t);
+  let m = 60;
+  for (let t = Date.now() - days * 86400000; t < Date.now(); t += everyMs) {
+    m -= 0.07 + Math.random() * 0.04; // roughly 15% a day, like a pot near a window
+    if (waters.some((w) => w > t - everyMs && w <= t)) m += 35;
+    m = Math.max(8, Math.min(92, m));
+    out.push({ t, m: Math.round(m) });
+  }
+  return out;
+}
+
+// One line per kind of event on a day (latest time + how many), so repeat logs don't stack up.
+export function summarizeDay(events: PlantEvent[]) {
+  return (['water', 'dry'] as const)
+    .map((kind) => {
+      const times = events.filter((e) => e.kind === kind).map((e) => e.t);
+      return { kind, count: times.length, last: times.length ? Math.max(...times) : 0 };
+    })
+    .filter((s) => s.count > 0)
+    .sort((a, b) => a.last - b.last);
+}
