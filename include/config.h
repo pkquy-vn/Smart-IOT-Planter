@@ -27,9 +27,10 @@
 // ==========================================
 // Application Configuration
 // ==========================================
-// Threshold at which the soil is considered "dry" (needs to be calibrated)
-// The value depends on your sensor's ADC reading (usually 0-4095 on ESP32)
-#define MOISTURE_DRY_THRESHOLD 2000
+// Soil moisture calibration (raw ADC, 0-4095). Read "raw" from /status with the
+// probe in dry air and then in a cup of water, and put those two numbers here.
+#define MOISTURE_RAW_DRY 3000
+#define MOISTURE_RAW_WET 1500
 
 // How long the pump should stay on when triggered (in milliseconds)
 #define PUMP_ON_DURATION_MS 5000

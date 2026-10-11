@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <memory>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include "esp_camera.h"
@@ -69,8 +70,21 @@ void initServer() {
 
     // Web Route 2: GET /status for the mobile app
     server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
-        int moisture = getMoisturePercentage();
-        String json = "{\"moisture\":" + String(moisture) + ",\"temperature\":null}";
+        float t = getTemperatureC();
+        float h = getHumidity();
+
+        String json = "{\"moisture\":";
+        json += getMoisturePercentage();
+        json += ",\"raw\":";
+        json += getMoistureRaw();
+        json += ",\"temperature\":";
+        if (isnan(t)) json += "null"; else json += String(t, 1);
+        json += ",\"humidity\":";
+        if (isnan(h)) json += "null"; else json += String(h, 0);
+        json += ",\"pumpRunning\":";
+        json += pumpIsRunning() ? "true" : "false";
+        json += "}";
+
         AsyncWebServerResponse *response = request->beginResponse(200, "application/json", json);
         response->addHeader("Access-Control-Allow-Origin", "*");
         response->addHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -95,25 +109,26 @@ void initServer() {
 
     // Web Route 4: GET /capture - camera frame capture
     server.on("/capture", HTTP_GET, [](AsyncWebServerRequest *request){
-        camera_fb_t * fb = esp_camera_fb_get();
+        camera_fb_t *fb = esp_camera_fb_get();
         if (!fb) {
             request->send(500, "text/plain", "Camera capture failed");
             return;
         }
-        
-        AsyncWebServerResponse *response = request->beginResponse("image/jpeg", fb->len, 
-            [fb](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-                size_t bytes_to_send = fb->len - index;
-                if (bytes_to_send == 0) {
-                    esp_camera_fb_return(fb); 
-                    return 0;
-                }
-                size_t chunk = (bytes_to_send > maxLen) ? maxLen : bytes_to_send;
-                memcpy(buffer, fb->buf + index, chunk);
+
+        // The driver gets the frame back automatically when the response
+        // (and this lambda) is destroyed, i.e. after the last byte is sent.
+        std::shared_ptr<camera_fb_t> frame(fb, esp_camera_fb_return);
+
+        AsyncWebServerResponse *response = request->beginResponse("image/jpeg", frame->len,
+            [frame](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+                if (index >= frame->len) return 0;
+                size_t remaining = frame->len - index;
+                size_t chunk = (remaining > maxLen) ? maxLen : remaining;
+                memcpy(buffer, frame->buf + index, chunk);
                 return chunk;
             }
         );
-        
+
         response->addHeader("Access-Control-Allow-Origin", "*");
         response->addHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
         response->addHeader("Access-Control-Allow-Headers", "*");

@@ -21,14 +21,13 @@ void setup() {
 
 void loop() {
     pumpUpdate();
-    
-    // Non-blocking status reporting every 2 seconds
-    static unsigned long lastSensorLog = 0;
-    if (millis() - lastSensorLog >= 2000) {
-        lastSensorLog = millis();
-        int moisture = getMoisturePercentage();
-        Serial.print("Current Soil Moisture: ");
-        Serial.print(moisture);
-        Serial.println("%");
+    sensorsUpdate();
+
+    // Non-blocking status log every 2 seconds
+    static unsigned long lastLog = 0;
+    if (millis() - lastLog >= 2000) {
+        lastLog = millis();
+        Serial.printf("Moisture: %d%% (raw %d)  Temp: %.1f C  Humidity: %.0f%%\n",
+                      getMoisturePercentage(), getMoistureRaw(), getTemperatureC(), getHumidity());
     }
 }
